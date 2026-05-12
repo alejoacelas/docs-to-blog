@@ -1,0 +1,98 @@
+name: preflight — verify gdoc + drive + anthropic in CI
+
+# Read-only verification that every external dependency the daily sync needs
+# is reachable and authenticated from a fresh GitHub Actions runner.
+# Doesn't commit, push, or modify any docs — just calls.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  preflight:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    env:
+      DOC_URL: https://docs.google.com/document/d/1qAD1VRFk4VkfmMM3AnDDH1LUqe_O6PrrzSfGOlLVbPQ/edit
+      LIBRARY_DOC_URL: https://docs.google.com/document/d/1sPikfxprgeHnrDd9TINgzN3NHqsc3b7xZbPWg2h-Vrw/edit
+      DOC_ID: 1qAD1VRFk4VkfmMM3AnDDH1LUqe_O6PrrzSfGOlLVbPQ
+
+    steps:
+      - name: Restore gdoc OAuth state from secrets
+        env:
+          GDOC_TOKEN_JSON_B64: ${{ secrets.GDOC_TOKEN_JSON_B64 }}
+          GDOC_CREDENTIALS_JSON_B64: ${{ secrets.GDOC_CREDENTIALS_JSON_B64 }}
+        run: |
+          mkdir -p "$HOME/.config/gdoc"
+          printf '%s' "$GDOC_TOKEN_JSON_B64" | base64 -d > "$HOME/.config/gdoc/token.json"
+          printf '%s' "$GDOC_CREDENTIALS_JSON_B64" | base64 -d > "$HOME/.config/gdoc/credentials.json"
+          chmod 600 "$HOME/.config/gdoc/"*.json
+          # Sanity: files exist and are non-empty JSON (no value echo).
+          python3 -c "import json,os; json.load(open(os.path.expanduser('~/.config/gdoc/token.json'))); print('token.json: parseable JSON')"
+          python3 -c "import json,os; json.load(open(os.path.expanduser('~/.config/gdoc/credentials.json'))); print('credentials.json: parseable JSON')"
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install uv and gdoc CLI
+        run: |
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          # shellcheck disable=SC1091
+          source "$HOME/.local/bin/env"
+          uv tool install "git+https://github.com/LucaDeLeo/gdoc.git"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: gdoc ls (auth sanity)
+        run: |
+          gdoc ls --plain | head -10
+          gdoc ls --plain | grep -q "docs-to-blog"
+
+      - name: gdoc cat — source doc body
+        run: |
+          gdoc cat "$DOC_URL" --plain > /tmp/body.md
+          test -s /tmp/body.md
+          grep -q "Hello, docs-to-blog" /tmp/body.md
+          echo "body lines: $(wc -l < /tmp/body.md)"
+
+      - name: gdoc cat — source doc styling tab
+        run: |
+          gdoc cat "$DOC_URL" --tab styling --plain > /tmp/styling.md
+          test -s /tmp/styling.md
+          echo "styling lines: $(wc -l < /tmp/styling.md)"
+
+      - name: gdoc cat — library doc
+        run: |
+          gdoc cat "$LIBRARY_DOC_URL" --plain > /tmp/library.md
+          test -s /tmp/library.md
+          grep -q "style library" /tmp/library.md
+          echo "library lines: $(wc -l < /tmp/library.md)"
+
+      - name: gdoc info — metadata
+        run: gdoc info "$DOC_URL" --json | tail -20
+
+      - name: Drive REST — version probe (daily polling field)
+        run: |
+          TOKEN=$(python3 -c "import json,os; print(json.load(open(os.path.expanduser('~/.config/gdoc/token.json')))['token'])")
+          RESP=$(curl -sf --max-time 10 \
+            "https://www.googleapis.com/drive/v3/files/${DOC_ID}?fields=version,modifiedTime,name" \
+            -H "Authorization: Bearer $TOKEN")
+          echo "$RESP" | python3 -m json.tool
+          echo "$RESP" | grep -q '"version"'
+
+      - name: Anthropic API smoke
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          RESP=$(curl -sf --max-time 15 https://api.anthropic.com/v1/messages \
+            -H "x-api-key: $ANTHROPIC_API_KEY" \
+            -H "anthropic-version: 2023-06-01" \
+            -H "content-type: application/json" \
+            -d '{"model":"claude-haiku-4-5","max_tokens":8,"messages":[{"role":"user","content":"reply: ok"}]}')
+          echo "$RESP" | python3 -c "import sys,json; r=json.load(sys.stdin); assert r.get('content'), r; print('model:', r['model']); print('reply:', r['content'][0].get('text'))"
+
+      - name: Summary
+        if: always()
+        run: |
+          echo "::notice::Preflight finished. If every step above is green, gdoc/drive/anthropic all work on the runner with the current secrets."
