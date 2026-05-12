@@ -19,7 +19,7 @@ These are already provisioned and authenticated on the machine running the build
 | Source Google Doc (body tab + `styling` tab) | `https://docs.google.com/document/d/1qAD1VRFk4VkfmMM3AnDDH1LUqe_O6PrrzSfGOlLVbPQ/edit` — mirrored as `DOC_URL` in `.env` and `[doc].url` in `project.toml` | `scripts/pull.ts`, `scripts/pull-tab.ts` |
 | Library Google Doc (gallery body + `styling` tab) | `https://docs.google.com/document/d/1sPikfxprgeHnrDd9TINgzN3NHqsc3b7xZbPWg2h-Vrw/edit` — mirrored as `LIBRARY_DOC_URL` and `[doc].library_url` | `scripts/pull-library.ts` |
 | `gdoc` OAuth token + client | `~/.config/gdoc/token.json` (refresh-token-bearing); `~/.config/gdoc/credentials.json` (OAuth client) | local `gdoc cat`; CI restores from base64 secrets `GDOC_TOKEN_JSON_B64` + `GDOC_CREDENTIALS_JSON_B64` |
-| `ANTHROPIC_API_KEY` | `~/.config/credentials/.env` (global) and `.env` (project, gitignored); CI repo secret of the same name | `claude -p --bare …` in the reconciler step |
+| `ANTHROPIC_API_KEY` | `~/.config/credentials/.env` (global) and `.env` (project, gitignored); CI repo secret of the same name | Anthropic SDK calls in the LLM steps (see §7) |
 | `gh` CLI auth | macOS keychain (account `alejoacelas`), scopes `repo`, `workflow`, `gist`, `read:org` | repo provisioning, PR opening, Pages enable |
 | GitHub repo + Pages | Provisioned during pre-flight; remote is `origin`. Pages source: `workflow`. | the deploy step in the daily sync |
 | `project.toml` | repo root, committed | every pipeline script — doc URLs, cron, fuzzy threshold, cost cap, implementation toggle |
@@ -40,7 +40,8 @@ These are already provisioned and authenticated on the machine running the build
 | Paragraph styling | **Prototype two implementations, A and B** (see §3) | We don't yet trust fuzzy-only matching, and we don't yet trust Claude-only matching. Build both, compare on real edits. |
 | Reconciler trust | **Claude reviews the diff every sync** in both A and B | No silent auto-apply — even in A, Claude is not an orphan-only fallback; it sees every change between sync N-1 and N. |
 | Per-sentence styling | **Out of scope for v1** | Use span tags instead. |
-| Runner | **GitHub Actions on a daily cron** | Only host that can run the `gdoc` Python binary, `claude` CLI, and `git push`. |
+| LLM execution model | **Anthropic SDK directly (no Claude Code, no agent harness)** | Every LLM step is a bounded transform — known inputs in, structured output out. The orchestrator runs deterministic validators + optional review-pass calls in a bounded retry loop. Looping and tooling stay in our code, not inside an agent. See §7. |
+| Runner | **GitHub Actions on a daily cron, driving a small script** | Free, has Python for `gdoc`, has `git`, has HTTPS to `api.anthropic.com`. Nothing about the runner is Claude-Code-specific anymore. |
 | Auth in CI | **`token.json` planted from base64 secret** | gdoc CLI's OAuth refresh-token flow works in Actions. |
 | Deploy | **GitHub Pages** (or Cloudflare Pages) | Static site, free, push-to-deploy. |
 | PR policy | **Always open a PR; auto-merge opt-in via `pipeline.toml`** | Default to safety; flip to autonomous later. |
