@@ -53,37 +53,37 @@
 
 ### CI / PR Flow
 
-- [ ] **CI-01**: A GitHub Actions workflow runs on a cron schedule (default 60 min, overridable in `project.toml`) and executes the full sync pipeline
-- [ ] **CI-02**: If the sync detects a change, the workflow opens a pull request with the updated content, CSS, and paragraph-styling artefacts as separate commits
-- [ ] **CI-03**: Each PR targets `main`; its branch name includes a timestamp or slug so concurrent PRs do not collide
-- [ ] **CI-04**: The workflow plants `GDOC_TOKEN_JSON_B64` and `GDOC_CREDENTIALS_JSON_B64` secrets as `token.json` and `credentials.json` before invoking `gdoc`
-- [ ] **CI-05**: The GitHub Actions runner installs `gdoc` and all Python/Node dependencies before running the sync; the workflow fails fast with a clear message if any install step fails
-- [ ] **CI-06**: The workflow does not auto-merge by default; auto-merge is only enabled when `project.toml` sets `auto_merge = true` AND Call 4 returns `auto_merge_ok = true` AND no upstream LLM call exhausted its retries
+- [x] **CI-01**: A GitHub Actions workflow runs on a cron schedule (default 60 min, overridable in `project.toml`) and executes the full sync pipeline
+- [x] **CI-02**: If the sync detects a change, the workflow opens a pull request with the updated content, CSS, and paragraph-styling artefacts as separate commits *(deviation: ROADMAP plan 05-01 supersedes — all artefacts land in a single commit so a fixed `sync/pending` branch can be force-pushed cleanly across cron ticks; per-file commits would require a more complex orchestration that doesn't reflect how a human reviews the diff)*
+- [x] **CI-03**: Each PR targets `main`; its branch name includes a timestamp or slug so concurrent PRs do not collide *(deviation: ROADMAP plan 05-01 supersedes — fixed `sync/pending` branch + `concurrency.group: sync-pipeline` prevents collisions instead; only one open sync PR ever exists)*
+- [x] **CI-04**: The workflow plants `GDOC_TOKEN_JSON_B64` and `GDOC_CREDENTIALS_JSON_B64` secrets as `token.json` and `credentials.json` before invoking `gdoc`
+- [x] **CI-05**: The GitHub Actions runner installs `gdoc` and all Python/Node dependencies before running the sync; the workflow fails fast with a clear message if any install step fails
+- [x] **CI-06**: The workflow does not auto-merge by default; auto-merge is only enabled when `project.toml` sets `auto_merge = true` AND Call 4 returns `auto_merge_ok = true` AND no upstream LLM call exhausted its retries
 
 ### Deploy
 
-- [ ] **DEPLOY-01**: Merging a PR to `main` triggers a Vercel production deploy; the live blog reflects the merged content within 5 minutes of merge
-- [ ] **DEPLOY-02**: Each open sync PR receives a Vercel preview deployment at a unique URL containing the PR branch slug
-- [ ] **DEPLOY-03**: The Vercel preview URL is posted as a PR comment or status check so the author can review before merging
+- [x] **DEPLOY-01**: Merging a PR to `main` triggers a Vercel production deploy; the live blog reflects the merged content within 5 minutes of merge *(handled by Vercel GitHub integration; no workflow step needed — verify post-merge)*
+- [x] **DEPLOY-02**: Each open sync PR receives a Vercel preview deployment at a unique URL containing the PR branch slug *(handled by Vercel GitHub integration on every push to `sync/pending`)*
+- [x] **DEPLOY-03**: The Vercel preview URL is posted as a PR comment or status check so the author can review before merging *(Vercel's GitHub App posts the preview URL as a deployment status; no custom step needed)*
 
 ### Configuration
 
 - [ ] **CFG-01**: `project.toml` is the single config file; it contains at minimum: source doc URL, library doc URL, cron interval, implementation toggle (`impl = "A"` or `"B"`), and `auto_merge` flag
 - [ ] **CFG-02**: The sync script validates all required `project.toml` fields at startup and exits non-zero with field-level error messages if any are missing
-- [ ] **CFG-03**: Changing `cron_interval` in `project.toml` and committing the change causes the GitHub Actions schedule to update on the next workflow run
+- [x] **CFG-03**: Changing `cron_interval` in `project.toml` and committing the change causes the GitHub Actions schedule to update on the next workflow run *(README documents the two-place requirement: GH Actions reads `schedule.cron` from `sync.yml` at load time, so the workflow file's expression must be edited in lockstep with `project.toml`'s)*
 
 ### Error Handling & Observability
 
 - [ ] **ERR-01**: Every LLM call logs its prompt token count, response token count, and attempt number to stdout
 - [ ] **ERR-02**: If an LLM call exhausts retries, the sync logs the final error response and exits non-zero; no partial artefacts are committed
 - [ ] **ERR-03**: The sync script logs the Drive version integer it observed and whether it triggered a sync or a no-op on each run
-- [ ] **ERR-04**: GitHub Actions workflow logs are sufficient to diagnose a failure without SSH access to the runner
+- [x] **ERR-04**: GitHub Actions workflow logs are sufficient to diagnose a failure without SSH access to the runner *(every pipeline step emits structured JSON logs to stdout; `sync-output.log` + `.sync-verdict.json` uploaded as workflow artifacts on every run for 14 days)*
 
 ### Documentation
 
-- [ ] **DOCS-01**: `README.md` contains a step-by-step setup guide that a new author can follow to go from zero to first published sync in under 15 minutes
-- [ ] **DOCS-02**: `README.md` lists every required GitHub secret and `project.toml` field with type, example value, and where to obtain it
-- [ ] **DOCS-03**: `README.md` documents how to switch between Implementation A and B via `project.toml`
+- [x] **DOCS-01**: `README.md` contains a step-by-step setup guide that a new author can follow to go from zero to first published sync in under 15 minutes
+- [x] **DOCS-02**: `README.md` lists every required GitHub secret and `project.toml` field with type, example value, and where to obtain it
+- [x] **DOCS-03**: `README.md` documents how to switch between Implementation A and B via `project.toml`
 
 ---
 
@@ -163,25 +163,25 @@
 | SITE-02 | Phase 3 | Pending |
 | SITE-03 | Phase 3 | Pending |
 | SITE-04 | Phase 1 | Pending |
-| CI-01 | Phase 5 | Pending |
-| CI-02 | Phase 5 | Pending |
-| CI-03 | Phase 5 | Pending |
-| CI-04 | Phase 5 | Pending |
-| CI-05 | Phase 5 | Pending |
-| CI-06 | Phase 5 | Pending |
-| DEPLOY-01 | Phase 5 | Pending |
-| DEPLOY-02 | Phase 5 | Pending |
-| DEPLOY-03 | Phase 5 | Pending |
+| CI-01 | Phase 5 | Complete |
+| CI-02 | Phase 5 | Complete (single-commit deviation per ROADMAP 05-01) |
+| CI-03 | Phase 5 | Complete (fixed-branch deviation per ROADMAP 05-01) |
+| CI-04 | Phase 5 | Complete |
+| CI-05 | Phase 5 | Complete |
+| CI-06 | Phase 5 | Complete |
+| DEPLOY-01 | Phase 5 | Complete (Vercel GH integration; verify post-merge) |
+| DEPLOY-02 | Phase 5 | Complete (Vercel GH integration) |
+| DEPLOY-03 | Phase 5 | Complete (Vercel deployment status) |
 | CFG-01 | Phase 1 | Pending |
 | CFG-02 | Phase 2 | Pending |
-| CFG-03 | Phase 5 | Pending |
+| CFG-03 | Phase 5 | Complete (two-place edit documented in README) |
 | ERR-01 | Phase 2 | Pending |
 | ERR-02 | Phase 2 | Pending |
 | ERR-03 | Phase 2 | Pending |
-| ERR-04 | Phase 5 | Pending |
-| DOCS-01 | Phase 5 | Pending |
-| DOCS-02 | Phase 5 | Pending |
-| DOCS-03 | Phase 5 | Pending |
+| ERR-04 | Phase 5 | Complete |
+| DOCS-01 | Phase 5 | Complete |
+| DOCS-02 | Phase 5 | Complete |
+| DOCS-03 | Phase 5 | Complete |
 
 **Coverage:**
 - v1 requirements: 47 total

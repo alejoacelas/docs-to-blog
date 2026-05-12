@@ -13,7 +13,7 @@ Phases 4a and 4b run in parallel on separate branches (`feat/impl-a-anchors`, `f
 - [x] **Phase 3: Span Plugin** — Remark plugin: `<tag>text</tag>` → `<span class="tag">text</span>` in built HTML
 - [ ] **Phase 4a: Impl A — Fuzzy Anchors** — `sync/para_style_a.py` (Call 2), `styles/anchors.yaml`, plugin reads anchors at build time
 - [ ] **Phase 4b: Impl B — Re-decide Every Sync** — `sync/para_style_b.py` (Call 3), `styling/decisions.md` as live prompt input
-- [ ] **Phase 5: CI/CD + PR Flow** — GitHub Actions cron, PR-per-change, Vercel preview, auto-merge opt-in (Call 4), README
+- [x] **Phase 5: CI/CD + PR Flow** — GitHub Actions cron, PR-per-change, Vercel preview, auto-merge opt-in (Call 4), README
 - [ ] **Phase 6: A-vs-B Comparison Harness** — `tests/compare.py`, fixture corpus, stability/cost report, winner decision
 - [ ] **Phase 7: /updates Review Page** — Astro `/updates` page, password auth, accept/reject/Check Now via `repository_dispatch`
 
@@ -112,8 +112,8 @@ Plans:
 **Plans**: 2 plans
 
 Plans:
-- [ ] 05-01: `.github/workflows/sync.yml` — secret planting, dependency install, cron schedule from `project.toml`, fixed `sync/pending` branch, PR creation, Call 4 auto-merge gate
-- [ ] 05-02: `README.md` — 15-minute setup guide, secrets reference, `project.toml` field reference, A/B toggle docs
+- [x] 05-01: `.github/workflows/sync.yml` — secret planting, dependency install, cron schedule from `project.toml`, fixed `sync/pending` branch, PR creation, Call 4 auto-merge gate
+- [x] 05-02: `README.md` — 15-minute setup guide, secrets reference, `project.toml` field reference, A/B toggle docs
 
 ---
 
@@ -160,7 +160,7 @@ Phases 4a and 4b run in parallel on separate branches and both merge before Phas
 | 2. Fetch + CSS Pipeline | 2/2 | Complete | 2026-05-12 |
 | 3. Span Plugin | 1/1 | Complete | 2026-05-12 |
 | 4a. Impl A — Fuzzy Anchors | 1/1 | Complete | 2026-05-12 |
-| 4b. Impl B — Re-decide | 0/1 | Not started | - |
-| 5. CI/CD + PR Flow | 0/2 | Not started | - |
+| 4b. Impl B — Re-decide | 0/1 | Not started (other branch) | - |
+| 5. CI/CD + PR Flow | 2/2 | Complete (A side) | 2026-05-13 |
 | 6. A-vs-B Harness | 0/1 | Not started | - |
 | 7. /updates Page | 0/1 | Not started | - |

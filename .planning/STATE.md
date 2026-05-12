@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-05-12)
 
 **Core value:** The author edits the Google Doc; the published site reflects those edits the next morning, styled correctly, with no manual intervention required.
-**Current focus:** Phase 5 — CI/CD + PR Flow
+**Current focus:** Phase 6 — A-vs-B Comparison Harness (Phase 5 complete on this branch)
 
 ## Current Position
 
-Phase: 5 of 7 (CI/CD + PR Flow)
-Plan: 0 of 2 in current phase
-Status: Ready to plan (after Phase 4b merges)
-Last activity: 2026-05-12 — Phase 4a complete; `sync/anchors.py` data model + paragraph parser + diff-match-patch fuzzy matcher; `sync/para_style_a.py` Call 2 reconciler (bounded transform + validators + review pass + 3-attempt retry); `src/plugins/remark-anchors.ts` injects classes on `<p>` wrappers from anchors.yaml; pipeline wired into `sync/__main__.py`; first smoke run produced one valid anchor on the napkin paragraph at $0.014 Call 2 cost; built HTML carries `<p class="aside">`; 61 pytest + 21 vitest cases all green
+Phase: 5 of 7 (CI/CD + PR Flow) — complete on `feat/impl-a-anchors`
+Plan: 2 of 2 in current phase
+Status: Complete on this branch (Implementation A side only — B branch ships its own copy)
+Last activity: 2026-05-13 — Phase 5 complete; `sync/diff_review.py` (Call 4) bounded transform with 1 retry + tolerant JSON extraction + schema validators; wired into `sync/__main__.py` after css_gen + para_style_a with upstream-retry-exhaustion tracking; verdict written to `.sync-verdict.json` (gitignored); `.github/workflows/sync.yml` cron + workflow_dispatch + fixed `sync/pending` branch + Vercel auto-deploy via GitHub integration + auto-merge gate; `README.md` 15-minute setup guide; actionlint clean; 78 pytest + 21 vitest cases all green
 
-Progress: [█████░░░░░] 57%
+Progress: [██████░░░░] 71%
 
 ## Performance Metrics
 
@@ -31,6 +31,7 @@ Progress: [█████░░░░░] 57%
 | 2. Fetch + CSS Pipeline | 2 | — | — |
 | 3. Span Plugin | 1 | — | — |
 | 4a. Impl A — Fuzzy Anchors | 1 | — | — |
+| 5. CI/CD + PR Flow | 2 | — | — |
 
 **Recent Trend:** No data yet
 
@@ -59,6 +60,10 @@ Recent decisions affecting current work:
 - P4a: diff-match-patch's `Match_Threshold` semantics ("0 = exact, 1 = anything") inverts the project.toml convention ("closer to 1.0 = stricter"). The fuzzy matcher inverts on the way in so the config field reads naturally.
 - P4a: At-most-one-anchor-per-paragraph is enforced by the validator — `(heading, ordinal)` is the unique key. Two classes on the same paragraph would be a v2 affordance.
 - P4a: Astro 5's content layer caches rendered HTML in `node_modules/.astro/data-store.json`. Its cache digest doesn't reach into `anchors.yaml`, so the sync pipeline eagerly invalidates the cache after every reconciler write — otherwise the next `astro build` would serve stale HTML missing the new classes.
+- P5: Call 4 (diff_review) uses 1 retry only (per PLAN §7.2) — on failure it defaults `auto_merge_ok=false` and surfaces the parse issue as a concern; no validator-exhaustion crash because this is the gate, not a transform.
+- P5: Auto-merge gate combines three booleans: `project.toml [sync].auto_merge` (author opt-in) AND Call 4's `auto_merge_ok` AND `NOT upstream_retry_exhausted` (CI-06). The combined verdict is persisted to `.sync-verdict.json` (gitignored) so the workflow only reads one bool.
+- P5: Single fixed `sync/pending` branch prevents duplicate PRs across cron ticks. Existing branch → force-push + edit existing PR + drop a comment with the new run ID; missing branch → create + open. PR body always carries the latest verdict.
+- P5: The cron expression lives in two places — `project.toml [sync].cron` (consumed by the pipeline) and `.github/workflows/sync.yml` `schedule.cron` (consumed by GH Actions at workflow-load time). README documents the requirement to keep them in sync.
 
 ### Pending Todos
 
@@ -76,6 +81,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-05-12
-Stopped at: Phase 4a complete — `sync/anchors.py` holds the Anchor/Quote/Paragraph dataclasses, hash function, markdown paragraph parser, and diff-match-patch fuzzy matcher (20 pytest cases). `sync/para_style_a.py` runs Call 2 as a bounded transform: assembles inputs, calls Claude once, runs five deterministic validators (parse, class known, quote substring, ordinal reachable, hash match, no duplicate position), optional review pass, three retries with failure folded back, hard-fail on validator exhaustion per IMPL-A-04 (18 pytest cases). `src/plugins/remark-anchors.ts` reads anchors.yaml at build time and attaches `data.hProperties.className` to matched paragraphs (8 vitest cases). Astro's content-layer cache (`node_modules/.astro/data-store.json`) is invalidated after every reconciler write. Smoke run against the real Google Doc produced one anchor (`aside` on the napkin paragraph) at $0.014 Call 2 cost; `<p class="aside">` lands in the built HTML. Ready for Phase 4b (parallel branch) and Phase 5 (CI/CD).
+Last session: 2026-05-13
+Stopped at: Phase 5 complete on `feat/impl-a-anchors`. `sync/diff_review.py` is the Call 4 bounded transform — single Claude call, tolerant JSON extraction, deterministic schema validation, 1 retry, defaults `auto_merge_ok=false` on parse exhaustion (17 pytest cases). `sync/__main__.py` runs Call 4 after css_gen + para_style_a, tracks whether either upstream call hit a needs-attention state (CI-06), and writes `.sync-verdict.json` for the workflow to consume. `.github/workflows/sync.yml` is the daily cron: restores gdoc OAuth from base64 secrets to `~/.config/gdoc/accounts/default/token.json` per preflight's path, installs uv + node + gdoc CLI + Python + JS deps, runs `uv run python -m sync`, captures `sync-output.log`, force-pushes to a fixed `sync/pending` branch, edits-or-creates the PR with the verdict in the body, gates auto-merge on `project.toml [sync].auto_merge` ∧ `safe_to_auto_merge`. Vercel's GitHub integration handles preview deploys (PRs) and production deploys (merges to main) — no custom deploy step. `README.md` is the 15-minute setup guide (forks, secrets, project.toml reference, A-vs-B toggle, troubleshooting). `actionlint` clean. 78 pytest + 21 vitest all green. Smoke run via `gh workflow run sync.yml --ref feat/impl-a-anchors` deferred until post-push (the branch isn't on origin yet).
 Resume file: None
