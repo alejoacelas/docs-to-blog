@@ -1,0 +1,41 @@
+# docs-to-blog · pipeline configuration
+#
+# This file is read by every script in the daily sync pipeline. Credentials live
+# in environment variables (see .env / repo secrets); everything that's safe to
+# commit lives here.
+
+[doc]
+# The Google Doc that holds the blog body. Must have a tab titled `x styling`
+# alongside the main body tab. Created automatically; rename/replace as needed.
+url = "https://docs.google.com/document/d/1qAD1VRFk4VkfmMM3AnDDH1LUqe_O6PrrzSfGOlLVbPQ/edit"
+
+# The library doc holding reusable named styles shared across projects. Tags
+# defined here can be referenced from any project's `x styling` tab.
+library_url = "https://docs.google.com/document/d/1sPikfxprgeHnrDd9TINgzN3NHqsc3b7xZbPWg2h-Vrw/edit"
+
+# The exact tab title within the source doc that holds prose styling rules.
+styling_tab_title = "styling"
+
+[sync]
+# Cron expression for the daily sync (UTC). Default: 09:03 UTC.
+cron = "3 9 * * *"
+
+# When Claude resolves an orphan anchor, should we auto-merge the PR or
+# always wait for a human? v1 default: always human-review.
+auto_merge_orphans = false
+
+[anchoring]
+# diff-match-patch fuzzy threshold for quote-based anchor matching. Closer to
+# 1.0 = stricter match. 0.8 tolerates typo fixes and small word swaps.
+fuzzy_threshold = 0.8
+
+# Maximum turns Claude may take when reconciling a single orphan anchor.
+max_orphan_resolution_turns = 6
+
+# Maximum total cost per sync, in USD. The reconciler aborts if exceeded.
+max_cost_usd = 1.00
+
+[deploy]
+# How the rendered site is published. Options: "github-pages", "cloudflare-pages".
+# v1 default: github-pages, deployed via the same daily workflow.
+target = "github-pages"

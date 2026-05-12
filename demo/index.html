@@ -1,0 +1,435 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>docs-to-blog · Bundle 3+4 demo</title>
+<link rel="stylesheet" href="demo.css" />
+</head>
+<body>
+
+<header class="topbar">
+  <div class="topbar-inner">
+    <div class="brand">
+      <span class="brand-dot"></span>
+      <span class="brand-name">docs-to-blog</span>
+      <span class="brand-sep">/</span>
+      <span class="brand-bundle">Bundle 3 + 4 demo</span>
+    </div>
+    <div class="day-toggle" role="tablist" aria-label="Day state">
+      <button class="day-btn active" data-day="1">Day 1</button>
+      <button class="day-btn" data-day="2">Day 2 <span class="day-pill">after edits</span></button>
+    </div>
+  </div>
+  <nav class="viewtabs" role="tablist" aria-label="Demo view">
+    <button class="vt active" data-view="published">Published</button>
+    <button class="vt" data-view="doc">Source doc</button>
+    <button class="vt" data-view="styling">x styling tab</button>
+    <button class="vt" data-view="repo">Repo files</button>
+    <button class="vt" data-view="cycle">Edit cycle</button>
+  </nav>
+</header>
+
+<main class="views">
+
+  <!-- =============================== PUBLISHED =============================== -->
+  <section class="view active" data-view="published">
+    <div class="view-explain">
+      What a reader sees on the live blog. The pull-quote and the callout are styled by classes
+      defined in the <em>x styling</em> tab and applied to specific paragraphs by the repo sidecar.
+      Flip the Day toggle above to see the rebuilt site after the author's edits.
+    </div>
+
+    <article class="published-page">
+      <header class="post-header">
+        <p class="post-eyebrow">Essays · Nov 2024</p>
+        <h1 class="post-title">Notes on switching to plaintext</h1>
+        <p class="post-sub">Why I left Notion (and what I kept)</p>
+      </header>
+
+      <div class="post-body" data-day="1">
+        <h2 id="why">Why</h2>
+        <p>I spent six months in Notion before realizing my notes were trapped. Migrating out took a weekend of janky exports and reformatting. Never again.</p>
+        <p class="pull-quote">If you take only one thing from this post: own your text files.</p>
+        <p>The shape of the problem isn't "Notion is bad" — it's that any tool that holds your prose hostage to its UI eventually becomes a tax on thinking. The fix is to write in formats you can grep, version, and move.</p>
+
+        <h2 id="what-changed">What changed</h2>
+        <p class="callout">Worth flagging upfront: this isn't a clean migration. I still use Google Docs for collaboration and Notion for shared databases. The shift is <em>where the canonical copy lives</em> — which, for me, is now a folder of markdown files in a git repo<sup><a href="#fn1" id="fnref1">1</a></sup>.</p>
+        <p>Three things made it stick: a daily ritual, a sync pipeline, and the realization that almost nothing needs to be in a database.</p>
+
+        <ol class="footnotes">
+          <li id="fn1">…and yes, the irony of that sentence appearing on a site whose own pipeline runs through Google Docs is not lost on me. <a href="#fnref1" class="fn-back">↩</a></li>
+        </ol>
+      </div>
+
+      <div class="post-body" data-day="2" hidden>
+        <h2 id="why">Why</h2>
+        <p>I spent six months in Notion before realizing my notes were trapped. Migrating out took a weekend of clumsy exports and reformatting. Never again.</p>
+        <p class="pull-quote">If you take only one thing from this essay: own your text files.</p>
+        <p>The shape of the problem isn't "Notion is bad" — it's that any tool that holds your prose hostage to its UI eventually becomes a tax on thinking. The fix is to write in formats you can grep, version, and move.</p>
+
+        <h2 id="what-changed">What changed</h2>
+        <p>Before getting into the how, the short version of the why: I want a folder I can grep.</p>
+        <p class="callout">Let me clarify before we go further: this isn't a wholesale migration. Google Docs still handles drafts I share with people, and Notion still hosts shared databases. The canonical copy of my own writing, though — that now lives in a folder of markdown in a git repo<sup><a href="#fn1" id="fnref1">1</a></sup>.</p>
+        <p>Three things made it stick: a daily ritual, a sync pipeline, and the realization that almost nothing needs to be in a database.</p>
+
+        <ol class="footnotes">
+          <li id="fn1">…and yes, the irony of that sentence appearing on a site whose own pipeline runs through Google Docs is not lost on me. <a href="#fnref1" class="fn-back">↩</a></li>
+        </ol>
+      </div>
+    </article>
+  </section>
+
+  <!-- =============================== DOC =============================== -->
+  <section class="view" data-view="doc">
+    <div class="view-explain">
+      The Google Doc body the author writes. Plain prose — no styling markup, no tags, no IDs.
+      In Day 2, edits are inline-highlighted: <span class="ins">inserted</span> and <span class="del">deleted</span>.
+    </div>
+
+    <div class="dual">
+      <div class="dual-col" data-day-only="1">
+        <div class="panel-head">Day 1 — Google Doc body</div>
+        <pre class="prose-pre"># Notes on switching to plaintext
+
+## Why
+
+I spent six months in Notion before realizing my notes were trapped. Migrating out took a weekend of janky exports and reformatting. Never again.
+
+If you take only one thing from this post: own your text files.
+
+The shape of the problem isn't "Notion is bad" — it's that any tool that holds your prose hostage to its UI eventually becomes a tax on thinking. The fix is to write in formats you can grep, version, and move.
+
+## What changed
+
+Worth flagging upfront: this isn't a clean migration. I still use Google Docs for collaboration and Notion for shared databases. The shift is *where the canonical copy lives* — which, for me, is now a folder of markdown files in a git repo[^1].
+
+Three things made it stick: a daily ritual, a sync pipeline, and the realization that almost nothing needs to be in a database.
+
+[^1]: ...and yes, the irony of that sentence appearing on a site whose own pipeline runs through Google Docs is not lost on me.</pre>
+      </div>
+
+      <div class="dual-col" data-day-only="2" hidden>
+        <div class="panel-head">Day 2 — Google Doc body <span class="head-tag">edits shown inline</span></div>
+        <pre class="prose-pre"># Notes on switching to plaintext
+
+## Why
+
+I spent six months in Notion before realizing my notes were trapped. Migrating out took a weekend of <span class="del">janky</span><span class="ins">clumsy</span> exports and reformatting. Never again.
+
+If you take only one thing from this <span class="del">post</span><span class="ins">essay</span>: own your text files.
+
+The shape of the problem isn't "Notion is bad" — it's that any tool that holds your prose hostage to its UI eventually becomes a tax on thinking. The fix is to write in formats you can grep, version, and move.
+
+## What changed
+
+<span class="ins">Before getting into the how, the short version of the why: I want a folder I can grep.</span>
+
+<span class="del">Worth flagging upfront: this isn't a clean migration. I still use Google Docs for collaboration and Notion for shared databases. The shift is *where the canonical copy lives* — which, for me, is now a folder of markdown files in a git repo[^1].</span>
+<span class="ins">Let me clarify before we go further: this isn't a wholesale migration. Google Docs still handles drafts I share with people, and Notion still hosts shared databases. The canonical copy of my own writing, though — that now lives in a folder of markdown in a git repo[^1].</span>
+
+Three things made it stick: a daily ritual, a sync pipeline, and the realization that almost nothing needs to be in a database.
+
+[^1]: ...and yes, the irony of that sentence appearing on a site whose own pipeline runs through Google Docs is not lost on me.</pre>
+      </div>
+    </div>
+  </section>
+
+  <!-- =============================== X STYLING =============================== -->
+  <section class="view" data-view="styling">
+    <div class="view-explain">
+      A separate <strong>tab</strong> inside the same Google Doc, titled <code>x styling</code> (lowercase).
+      The author writes <em>prose</em> describing how the page should look. Claude reads this at build
+      time and emits CSS. The tab is unchanged between Day 1 and Day 2 in this demo — styling rules
+      evolve slowly; prose changes daily.
+    </div>
+
+    <div class="panel">
+      <div class="panel-head">Tab name: <code>x styling</code> &nbsp;·&nbsp; <span class="head-meta">tab ID t.jxzi86kqzdol</span></div>
+      <pre class="prose-pre"># x styling
+
+## Global
+
+Personal essay. Lean literary, not techy. Warm cream background, deep brown text,
+soft gold accent. Body in a comfortable serif (Iowan Old Style / Charter), max
+width 65ch, generous line height. Slightly narrower on mobile.
+
+## Tags
+
+**pull-quote**
+Large serif, around 1.4× body size. Italic. No quotation-mark characters (the
+weight is the quote). Soft gold horizontal rule a few rems below.
+
+**callout**
+Cream-yellow box (warmer than the page background), rounded corners, generous
+padding, slightly smaller font than body. Italic optional. Used for asides,
+caveats, and "before we begin" framings.
+
+**footnote-ref**
+Subtle superscript link. Same gold as the accents. Don't make it pop.
+
+## Page-level
+
+Centered title block, eyebrow above title in small caps, subtitle in regular
+weight underneath. H2s sit a couple of lines below the previous paragraph
+without a decorative rule.</pre>
+    </div>
+  </section>
+
+  <!-- =============================== REPO =============================== -->
+  <section class="view" data-view="repo">
+    <div class="view-explain">
+      Everything below lives in the <strong>git repo</strong>. The CSS is generated by Claude from the
+      <code>x styling</code> tab (slow-changing, regenerated only when the tab is edited). The YAML
+      sidecar holds the per-paragraph anchors — this is what the daily reconciler touches.
+    </div>
+
+    <div class="repo-grid">
+      <div class="panel">
+        <div class="panel-head"><code>styles/main.css</code> <span class="head-tag">generated</span></div>
+<pre class="code-pre">:root {
+  --bg: #FAF6EE;
+  --ink: #1F1A14;
+  --accent: #B89545;
+  --callout-bg: #F4E7C2;
+  --measure: 65ch;
+}
+
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: 'Iowan Old Style', 'Charter', Georgia, serif;
+  line-height: 1.7;
+  font-size: 1.05rem;
+}
+
+article { max-width: var(--measure); margin: 0 auto; padding: 4rem 1.5rem; }
+
+h1.post-title { font-size: 2.4rem; font-weight: 600; }
+h2 { font-size: 1.4rem; margin-top: 2.5rem; }
+
+.pull-quote {
+  font-size: 1.45rem;
+  font-style: italic;
+  line-height: 1.5;
+  margin: 2.2rem 0 2.6rem;
+  padding-bottom: 1.6rem;
+  border-bottom: 1px solid var(--accent);
+}
+
+.callout {
+  background: var(--callout-bg);
+  border-radius: 10px;
+  padding: 1.1rem 1.3rem;
+  font-size: 0.97rem;
+  margin: 1.6rem 0;
+}
+
+sup a, .fn-back { color: var(--accent); text-decoration: none; }</pre>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head"><code>styles/main.yaml</code> <span class="head-tag">sidecar — fuzzy anchors</span></div>
+<pre class="code-pre" data-day="1">- class: pull-quote
+  anchor:
+    quote:
+      exact: "If you take only one thing from this post: own your text files."
+      prefix: "Never again.\n\n"
+      suffix: "\n\nThe shape of the"
+    heading: "Why"
+    ordinal: 2
+    hash: "9a44e1d2"
+
+- class: callout
+  anchor:
+    quote:
+      exact: "Worth flagging upfront: this isn't a clean migration."
+      prefix: "## What changed\n\n"
+      suffix: " I still use Google Docs"
+    heading: "What changed"
+    ordinal: 1
+    hash: "b67c0f31"</pre>
+
+<pre class="code-pre" data-day="2" hidden>- class: pull-quote
+  anchor:
+    quote:
+      exact: "If you take only one thing from this essay: own your text files."     <span class="note">← updated by fuzzy match (98% similarity)</span>
+      prefix: "Never again.\n\n"
+      suffix: "\n\nThe shape of the"
+    heading: "Why"
+    ordinal: 2
+    hash: "3f1a82c9"                                                                  <span class="note">← hash refreshed</span>
+
+- class: callout
+  anchor:
+    quote:
+      exact: "Let me clarify before we go further: this isn't a wholesale migration." <span class="note">← rewritten by Claude reconciler</span>
+      prefix: "I want a folder I can grep.\n\n"
+      suffix: " Google Docs still handles"
+    heading: "What changed"
+    ordinal: 2                                                                        <span class="note">← was 1, shifted by inserted paragraph</span>
+    hash: "c4d9e0a7"</pre>
+      </div>
+
+      <div class="panel panel-wide">
+        <div class="panel-head"><code>pipeline.yml</code> <span class="head-tag">GitHub Actions, daily 09:03 UTC</span></div>
+<pre class="code-pre">name: docs-to-blog sync
+on:
+  schedule: [{ cron: "3 9 * * *" }]
+  workflow_dispatch:
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Restore gdoc OAuth token
+        run: |
+          mkdir -p ~/.config/gdoc
+          echo "$GDOC_TOKEN_JSON_B64" | base64 -d &gt; ~/.config/gdoc/token.json
+        env: { GDOC_TOKEN_JSON_B64: ${{ secrets.GDOC_TOKEN_JSON_B64 }} }
+
+      - name: Detect change via Drive version
+        id: probe
+        run: scripts/probe-version.py
+
+      - name: Pull doc body + x styling tab
+        if: steps.probe.outputs.changed == 'true'
+        run: |
+          gdoc cat "$DOC_URL" &gt; content/main.md
+          scripts/pull-styling-tab.py "$DOC_URL" &gt; content/_styling.md
+
+      - name: Fuzzy reconcile anchors
+        if: steps.probe.outputs.changed == 'true'
+        id: reconcile
+        run: scripts/reconcile.js  # diff-match-patch, writes orphans.json
+
+      - name: Claude reconciler (only on orphans)
+        if: steps.reconcile.outputs.orphans &gt; 0
+        run: |
+          claude -p --bare --max-turns 6 \
+            --allowedTools "Read,Edit,Bash(git:*)" \
+            "$(cat scripts/reconcile-prompt.md)"
+        env: { ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }} }
+
+      - name: Commit &amp; open PR if anchors changed
+        run: scripts/open-pr-if-dirty.sh</pre>
+      </div>
+    </div>
+  </section>
+
+  <!-- =============================== EDIT CYCLE =============================== -->
+  <section class="view" data-view="cycle">
+    <div class="view-explain">
+      What happens between Day 1 and Day 2. The day toggle is irrelevant on this view — it's the whole transition.
+    </div>
+
+    <ol class="cycle">
+
+      <li class="cycle-step">
+        <div class="step-num">1</div>
+        <div class="step-body">
+          <h3>09:03 UTC — cron fires, Drive <code>version</code> bumped</h3>
+          <p>Probe sees yesterday's <code>version = 47</code> → today's <code>version = 52</code>. Trigger sync.</p>
+          <pre class="code-pre small">drive.files.get(fileId, fields="version")  →  { "version": "52" }
+prev = 47  →  changed = true</pre>
+        </div>
+      </li>
+
+      <li class="cycle-step">
+        <div class="step-num">2</div>
+        <div class="step-body">
+          <h3>Pull new markdown from <code>gdoc</code>, run fuzzy reconciler</h3>
+          <p>For each anchor in <code>styles/main.yaml</code>, try the selectors in order — quote, then heading+ordinal, then hash.</p>
+          <table class="reconcile">
+            <thead><tr><th>class</th><th>quote match</th><th>heading+ord</th><th>hash</th><th>verdict</th></tr></thead>
+            <tbody>
+              <tr><td><code>pull-quote</code></td><td class="ok">98% (1 word changed)</td><td>Why · ord 2 ✓</td><td>miss (text drifted)</td><td class="ok">matched · update quote+hash</td></tr>
+              <tr><td><code>callout</code></td><td class="bad">0% (text gone)</td><td class="bad">What changed · ord 1 → wrong para</td><td class="bad">miss</td><td class="bad">orphan</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </li>
+
+      <li class="cycle-step">
+        <div class="step-num">3</div>
+        <div class="step-body">
+          <h3>1 orphan — invoke Claude</h3>
+          <p><code>claude -p --bare --max-turns 6 …</code> with the orphaned anchor, the previous markdown, and the new markdown. Token cost on this doc: ~3.4k input, ~600 output → ≈ <strong>$0.04</strong>.</p>
+<pre class="code-pre small">PROMPT (abridged):
+  This anchor in styles/main.yaml has lost its target paragraph:
+    class: callout
+    quote: "Worth flagging upfront: this isn't a clean migration."
+
+  Previous markdown:  &lt;...&gt;
+  New markdown:       &lt;...&gt;
+
+  Find the paragraph in the new markdown that carries the same intent as
+  the original (a "before we begin / caveats" framing about the migration
+  not being clean). Update the anchor in place. Refresh the hash. If you
+  can't find a confident match, leave a TODO comment instead.</pre>
+        </div>
+      </li>
+
+      <li class="cycle-step">
+        <div class="step-num">4</div>
+        <div class="step-body">
+          <h3>Claude's diff on <code>styles/main.yaml</code></h3>
+<pre class="code-pre diff small">  - class: callout
+    anchor:
+      quote:
+-       exact: "Worth flagging upfront: this isn't a clean migration."
+-       prefix: "## What changed\n\n"
+-       suffix: " I still use Google Docs"
++       exact: "Let me clarify before we go further: this isn't a wholesale migration."
++       prefix: "I want a folder I can grep.\n\n"
++       suffix: " Google Docs still handles"
+      heading: "What changed"
+-     ordinal: 1
++     ordinal: 2
+-     hash: "b67c0f31"
++     hash: "c4d9e0a7"</pre>
+        </div>
+      </li>
+
+      <li class="cycle-step">
+        <div class="step-num">5</div>
+        <div class="step-body">
+          <h3>PR opened — human-in-the-loop review</h3>
+          <div class="prmock">
+            <div class="prmock-head">
+              <span class="prmock-icon">●</span>
+              <span class="prmock-title">sync: reconcile 1 orphan anchor in main.yaml</span>
+              <span class="prmock-num">#142</span>
+            </div>
+            <div class="prmock-meta">opened by <code>docs-to-blog-bot</code> · 1 file changed · +6 / −6</div>
+            <div class="prmock-body">
+              <p>Daily sync detected 1 orphan after fuzzy matching against the new doc revision (Drive version 52 → 47).</p>
+              <p><strong>Confidence:</strong> high (the new paragraph contains the phrases "before we go further", "isn't a wholesale migration", and "Google Docs still handles" — all semantically aligned with the original callout's intent).</p>
+              <p><strong>Auto-merge:</strong> disabled by default. Set <code>auto-merge-orphans: true</code> in pipeline config to skip the review step.</p>
+            </div>
+          </div>
+        </div>
+      </li>
+
+      <li class="cycle-step">
+        <div class="step-num">6</div>
+        <div class="step-body">
+          <h3>Merge → Pages rebuild → live site reflects Day 2</h3>
+          <p>Switch the day toggle at the top to <strong>Day 2</strong> and visit <em>Published</em> to see the final rendered state.</p>
+        </div>
+      </li>
+
+    </ol>
+  </section>
+
+</main>
+
+<footer class="bottombar">
+  <span>Static demo · all data hardcoded · open <code>demo/index.html</code> directly or <code>python -m http.server</code></span>
+</footer>
+
+<script src="demo.js"></script>
+</body>
+</html>

@@ -1,0 +1,372 @@
+/* =========================================================================
+   docs-to-blog demo — chrome (dark) + published page (warm cream)
+   ========================================================================= */
+
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Roboto, sans-serif;
+  background: #0f1115;
+  color: #d8dadf;
+  font-size: 14px;
+  min-height: 100vh;
+}
+
+/* ============================ TOPBAR ============================ */
+
+.topbar {
+  position: sticky; top: 0; z-index: 10;
+  background: #14171d;
+  border-bottom: 1px solid #232832;
+}
+.topbar-inner {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0.85rem 1.5rem;
+  max-width: 1400px; margin: 0 auto;
+}
+.brand { display: flex; align-items: center; gap: 0.55rem; font-weight: 500; }
+.brand-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: #B89545;
+  box-shadow: 0 0 8px #B8954555;
+}
+.brand-name { color: #f3f4f6; letter-spacing: -0.01em; }
+.brand-sep { color: #4a505c; }
+.brand-bundle { color: #9aa0a8; font-weight: 400; }
+
+.day-toggle {
+  display: inline-flex; background: #1c2129; border-radius: 8px; padding: 3px;
+  border: 1px solid #232832;
+}
+.day-btn {
+  appearance: none; background: transparent; border: 0;
+  color: #9aa0a8; font: inherit; cursor: pointer;
+  padding: 0.4rem 0.85rem; border-radius: 6px;
+  display: inline-flex; align-items: center; gap: 0.45rem;
+  transition: background 0.12s, color 0.12s;
+}
+.day-btn:hover { color: #e6e7eb; }
+.day-btn.active {
+  background: #2a3140; color: #f3f4f6;
+  box-shadow: inset 0 0 0 1px #3a4356;
+}
+.day-pill {
+  font-size: 0.72rem;
+  background: #B89545; color: #1a1408;
+  padding: 1px 6px; border-radius: 10px;
+  font-weight: 600; letter-spacing: 0.02em;
+}
+
+.viewtabs {
+  display: flex; gap: 0;
+  border-top: 1px solid #232832;
+  padding: 0 1.5rem;
+  max-width: 1400px; margin: 0 auto;
+  overflow-x: auto;
+}
+.vt {
+  appearance: none; background: transparent; border: 0;
+  color: #9aa0a8; font: inherit; cursor: pointer;
+  padding: 0.7rem 1rem;
+  border-bottom: 2px solid transparent;
+  white-space: nowrap;
+}
+.vt:hover { color: #e6e7eb; }
+.vt.active { color: #f3f4f6; border-bottom-color: #B89545; }
+
+/* ============================ VIEWS ============================ */
+
+.views { max-width: 1400px; margin: 0 auto; padding: 1.5rem; }
+.view { display: none; }
+.view.active { display: block; }
+
+.view-explain {
+  background: #181c24;
+  border: 1px solid #232832;
+  border-left: 3px solid #B89545;
+  border-radius: 6px;
+  padding: 0.85rem 1.1rem;
+  color: #c0c4cc;
+  font-size: 0.93rem;
+  line-height: 1.55;
+  margin-bottom: 1.5rem;
+}
+.view-explain em, .view-explain code { color: #e6e7eb; }
+code { font-family: "JetBrains Mono", "Fira Code", ui-monospace, Menlo, monospace; }
+
+.panel {
+  background: #14171d;
+  border: 1px solid #232832;
+  border-radius: 8px;
+  overflow: hidden;
+  margin-bottom: 1rem;
+}
+.panel-head {
+  padding: 0.65rem 0.95rem;
+  background: #181c24;
+  border-bottom: 1px solid #232832;
+  font-size: 0.85rem;
+  color: #c0c4cc;
+  display: flex; align-items: center; gap: 0.6rem;
+}
+.panel-head code { color: #f3f4f6; }
+.head-tag {
+  margin-left: auto;
+  font-size: 0.72rem;
+  background: #232832;
+  color: #9aa0a8;
+  padding: 2px 8px; border-radius: 10px;
+  text-transform: lowercase;
+  letter-spacing: 0.02em;
+}
+.head-meta { color: #6a7180; font-size: 0.78rem; margin-left: auto; }
+
+.prose-pre,
+.code-pre {
+  margin: 0;
+  padding: 1rem 1.1rem;
+  font-family: "JetBrains Mono", "Fira Code", ui-monospace, Menlo, monospace;
+  font-size: 0.83rem;
+  line-height: 1.6;
+  color: #d8dadf;
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow-x: auto;
+}
+.code-pre.small { font-size: 0.78rem; padding: 0.85rem 1rem; }
+
+.code-pre .note {
+  color: #B89545;
+  font-style: italic;
+}
+.code-pre.diff { background: #11141a; }
+.code-pre.diff .diff-add {
+  background: #16331f;
+  color: #b6f0c9;
+  display: inline-block;
+  width: 100%;
+}
+.code-pre.diff .diff-del {
+  background: #331620;
+  color: #f3b6be;
+  display: inline-block;
+  width: 100%;
+}
+
+/* ============================ DUAL COLS ============================ */
+
+.dual {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1rem;
+}
+
+/* ============================ REPO ============================ */
+
+.repo-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+.panel-wide { grid-column: 1 / -1; }
+
+/* ============================ DOC EDITS ============================ */
+
+.ins {
+  background: #1f3d2c;
+  color: #b6f0c9;
+  padding: 0 3px;
+  border-radius: 3px;
+  text-decoration: none;
+}
+.del {
+  background: #3d1f23;
+  color: #f3b6be;
+  padding: 0 3px;
+  border-radius: 3px;
+  text-decoration: line-through;
+  text-decoration-color: #f3b6be88;
+}
+
+/* ============================ EDIT CYCLE ============================ */
+
+.cycle { list-style: none; padding: 0; margin: 0; }
+.cycle-step {
+  display: grid;
+  grid-template-columns: 56px 1fr;
+  gap: 1rem;
+  align-items: start;
+  padding: 1rem 0;
+  border-bottom: 1px solid #232832;
+}
+.cycle-step:last-child { border-bottom: 0; }
+.step-num {
+  width: 36px; height: 36px;
+  border-radius: 50%;
+  background: #B89545;
+  color: #1a1408;
+  display: grid; place-items: center;
+  font-weight: 700;
+  margin: 0 auto;
+}
+.step-body h3 {
+  margin: 0.2rem 0 0.55rem;
+  color: #f3f4f6;
+  font-size: 1.02rem;
+  font-weight: 600;
+  letter-spacing: -0.005em;
+}
+.step-body p { margin: 0 0 0.7rem; color: #c0c4cc; line-height: 1.55; }
+
+.reconcile {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+  background: #14171d;
+  border: 1px solid #232832;
+  border-radius: 8px;
+  overflow: hidden;
+}
+.reconcile th, .reconcile td {
+  padding: 0.55rem 0.8rem;
+  border-bottom: 1px solid #232832;
+  text-align: left;
+  vertical-align: top;
+}
+.reconcile th {
+  background: #181c24;
+  color: #9aa0a8;
+  font-weight: 500;
+  font-size: 0.78rem;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+.reconcile tbody tr:last-child td { border-bottom: 0; }
+.reconcile td.ok { color: #8fdca6; }
+.reconcile td.bad { color: #f3a0aa; }
+
+.prmock {
+  background: #14171d;
+  border: 1px solid #2a3140;
+  border-radius: 8px;
+  overflow: hidden;
+}
+.prmock-head {
+  padding: 0.7rem 1rem;
+  background: #181c24;
+  display: flex; align-items: center; gap: 0.55rem;
+  border-bottom: 1px solid #232832;
+}
+.prmock-icon { color: #4ade80; }
+.prmock-title { color: #f3f4f6; font-weight: 500; flex: 1; }
+.prmock-num { color: #6a7180; font-family: "JetBrains Mono", monospace; font-size: 0.85rem; }
+.prmock-meta {
+  padding: 0.4rem 1rem;
+  font-size: 0.78rem;
+  color: #9aa0a8;
+  border-bottom: 1px solid #232832;
+}
+.prmock-meta code { color: #c0c4cc; }
+.prmock-body { padding: 0.9rem 1rem; color: #c0c4cc; font-size: 0.9rem; line-height: 1.55; }
+.prmock-body p { margin: 0 0 0.6rem; }
+.prmock-body p:last-child { margin: 0; }
+.prmock-body strong { color: #f3f4f6; }
+
+/* ============================ FOOTER ============================ */
+
+.bottombar {
+  text-align: center;
+  padding: 1.2rem;
+  color: #6a7180;
+  font-size: 0.8rem;
+  border-top: 1px solid #232832;
+  background: #14171d;
+  margin-top: 2rem;
+}
+.bottombar code { color: #9aa0a8; }
+
+/* =========================================================================
+   PUBLISHED PAGE — what the reader actually sees
+   This block is functionally what `styles/main.css` would render to.
+   Scoped to .published-page so it doesn't fight the demo chrome.
+   ========================================================================= */
+
+.published-page {
+  background: #FAF6EE;
+  color: #1F1A14;
+  font-family: 'Iowan Old Style', 'Charter', Georgia, serif;
+  line-height: 1.7;
+  font-size: 1.05rem;
+  max-width: 65ch;
+  margin: 0 auto;
+  padding: 3.5rem 2rem 4rem;
+  border-radius: 10px;
+  box-shadow: 0 10px 40px rgba(0,0,0,0.35);
+}
+.post-header { text-align: center; margin-bottom: 2.6rem; }
+.post-eyebrow {
+  margin: 0 0 0.6rem;
+  font-size: 0.78rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: #B89545;
+  font-family: -apple-system, "Inter", sans-serif;
+  font-weight: 500;
+}
+.post-title {
+  margin: 0;
+  font-size: 2.4rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  line-height: 1.15;
+}
+.post-sub {
+  margin: 0.55rem 0 0;
+  color: #5a4a30;
+  font-style: italic;
+  font-size: 1.1rem;
+}
+.published-page h2 {
+  font-size: 1.4rem;
+  font-weight: 600;
+  margin: 2.6rem 0 0.6rem;
+  letter-spacing: -0.005em;
+}
+.published-page p { margin: 0 0 1.1rem; }
+
+.pull-quote {
+  font-size: 1.5rem;
+  font-style: italic;
+  line-height: 1.45;
+  margin: 2.2rem 0 2.6rem;
+  padding-bottom: 1.6rem;
+  border-bottom: 1px solid #B89545;
+  color: #1F1A14;
+}
+
+.callout {
+  background: #F4E7C2;
+  border-radius: 10px;
+  padding: 1.1rem 1.35rem;
+  font-size: 0.97rem;
+  margin: 1.8rem 0;
+  line-height: 1.6;
+}
+
+.published-page sup a { color: #B89545; text-decoration: none; font-family: -apple-system, sans-serif; }
+.footnotes {
+  margin-top: 3rem;
+  padding-top: 1.2rem;
+  border-top: 1px solid #B8954555;
+  font-size: 0.92rem;
+  color: #3a2f1f;
+}
+.fn-back { color: #B89545; text-decoration: none; margin-left: 0.25rem; }
+
+/* responsive */
+@media (max-width: 900px) {
+  .repo-grid { grid-template-columns: 1fr; }
+  .cycle-step { grid-template-columns: 44px 1fr; }
+  .step-num { width: 30px; height: 30px; font-size: 0.85rem; }
+  .topbar-inner { flex-direction: column; gap: 0.6rem; align-items: flex-start; }
+}

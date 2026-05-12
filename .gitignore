@@ -1,0 +1,28 @@
+# Secrets — never commit
+.env
+.env.local
+*.pem
+
+# Node
+node_modules/
+
+# Astro
+.astro/
+dist/
+
+# Build
+build/
+.cache/
+
+# OS
+.DS_Store
+
+# Editors
+.vscode/
+.idea/
+
+# Logs
+*.log
+
+# Sub-agent transcripts (if any are written locally)
+.subagent-transcripts/
