@@ -39,9 +39,7 @@ jobs:
       - name: Install uv and gdoc CLI
         run: |
           curl -LsSf https://astral.sh/uv/install.sh | sh
-          # shellcheck disable=SC1091
-          source "$HOME/.local/bin/env"
-          uv tool install "git+https://github.com/LucaDeLeo/gdoc.git"
+          "$HOME/.local/bin/uv" tool install "git+https://github.com/LucaDeLeo/gdoc.git"
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 
       - name: gdoc ls (auth sanity)
