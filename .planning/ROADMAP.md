@@ -10,7 +10,7 @@ Phases 4a and 4b run in parallel on separate branches (`feat/impl-a-anchors`, `f
 
 - [x] **Phase 1: Foundations** — Repo scaffold, `project.toml` schema, Astro site shell deployed to Vercel
 - [x] **Phase 2: Fetch + CSS Pipeline** — `sync/fetch.py`, change detection, `sync/css_gen.py` (Call 1), normalised `styles/generated.css`
-- [ ] **Phase 3: Span Plugin** — Remark plugin: `<tag>text</tag>` → `<span class="tag">text</span>` in built HTML
+- [x] **Phase 3: Span Plugin** — Remark plugin: `<tag>text</tag>` → `<span class="tag">text</span>` in built HTML
 - [ ] **Phase 4a: Impl A — Fuzzy Anchors** — `sync/para_style_a.py` (Call 2), `styles/anchors.yaml`, plugin reads anchors at build time
 - [ ] **Phase 4b: Impl B — Re-decide Every Sync** — `sync/para_style_b.py` (Call 3), `styling/decisions.md` as live prompt input
 - [ ] **Phase 5: CI/CD + PR Flow** — GitHub Actions cron, PR-per-change, Vercel preview, auto-merge opt-in (Call 4), README
@@ -64,7 +64,7 @@ Plans:
 **Plans**: 1 plan
 
 Plans:
-- [ ] 03-01: `src/plugins/remark-spans.ts` — mdast visitor, span-tag → span-class transform, nested tag handling, bare-wrapper passthrough, `<tag>` escaping verification test
+- [x] 03-01: `src/plugins/remark-spans.ts` — mdast visitor, span-tag → span-class transform, nested tag handling, bare-wrapper passthrough, `<tag>` escaping verification test
 
 ---
 

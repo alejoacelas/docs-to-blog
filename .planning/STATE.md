@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-05-12)
 
 **Core value:** The author edits the Google Doc; the published site reflects those edits the next morning, styled correctly, with no manual intervention required.
-**Current focus:** Phase 3 — Span Plugin
+**Current focus:** Phase 4a — Impl A: Fuzzy Anchors
 
 ## Current Position
 
-Phase: 3 of 7 (Span Plugin)
+Phase: 4a of 7 (Impl A — Fuzzy Anchors)
 Plan: 0 of 1 in current phase
 Status: Ready to plan
-Last activity: 2026-05-12 — Phase 2 complete; daily sync entry point (`uv run python -m sync`) fetches doc body + styling tab + library, probes Drive version (no-op short-circuit works), regenerates `styles/generated.css` via Anthropic SDK direct, all validators in place, smoke run on the real source doc succeeded at ~$0.037
+Last activity: 2026-05-12 — Phase 3 complete; remark-spans plugin rewrites `<tag>text</tag>` → `<span class="tag">text</span>` end-to-end through Astro's markdown pipeline; gdoc escape behaviour empirically verified and unescaped in `sync/fetch.py`; 13 vitest cases + 9 pytest cases all green; hello.md smoke build renders the canonical aside as a span
 
-Progress: [██░░░░░░░░] 28%
+Progress: [████░░░░░░] 42%
 
 ## Performance Metrics
 
@@ -29,6 +29,7 @@ Progress: [██░░░░░░░░] 28%
 |-------|-------|-------|----------|
 | 1. Foundations | 2 | — | — |
 | 2. Fetch + CSS Pipeline | 2 | — | — |
+| 3. Span Plugin | 1 | — | — |
 
 **Recent Trend:** No data yet
 
@@ -50,6 +51,9 @@ Recent decisions affecting current work:
 - P2: `.sync-state.json` is committed so the no-op short-circuit works across CI runs. Schema: `{"doc_version": int, "library_version": int}`.
 - P2: Deterministic-validator failure exits non-zero; review-pass-only failure commits the last good attempt with `needs_attention=true` per PLAN §7.1 step 6.
 - P2: Production model is `claude-sonnet-4-6` (alias). Pricing $3/MTok input + $15/MTok output. Cost cap is `[anchoring].max_cost_usd`, default $1.00 per sync.
+- P3: `gdoc cat` markdown export escapes every angle bracket as `\<` / `\>`. Unescape happens in `sync/fetch.py` (narrow regex on `[a-z][a-z0-9-]*`-shaped tagnames only) before the markdown is written to disk, so the remark plugin sees canonical `<tag>` syntax and doesn't have to know about gdoc's quirks. See `notes/2026-05-12-gdoc-span-escaping.md`.
+- P3: Remark already splits `<aside>x</aside>` inside a paragraph into three flat siblings (open-html, text, close-html). The plugin rewrites those html-node values rather than parsing strings — simpler, naturally handles nesting, and lets unbalanced opens/closes pass through verbatim with no error.
+- P3: Plugin uses raw mdast `html` nodes (not MDX). Astro's default markdown pipeline already enables `allowDangerousHtml` + `rehypeRaw`, so the emitted `<span class="...">` survives to the rendered page.
 
 ### Pending Todos
 
@@ -57,7 +61,7 @@ None yet.
 
 ### Blockers/Concerns
 
-- **[Pre-P3]** Whether `gdoc cat` preserves `<tag>text</tag>` syntax or escapes it is unconfirmed. Must verify empirically before writing the span parser in Phase 3.
+None.
 
 ## Deferred Items
 
@@ -68,5 +72,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-05-12
-Stopped at: Phase 2 complete — daily sync entry point pulls doc + styling tab + library, probes Drive version (no-op exits 0 in <1s), regenerates `styles/generated.css` via Anthropic SDK direct (sonnet-4-6) with validators + bounded retry; tests pass; smoke run hit real services at ~$0.037. Ready to start Phase 3 (Span Plugin).
+Stopped at: Phase 3 complete — `sync/fetch.py` unescapes gdoc's `\<tag\>` markdown export (pytest 9/9), `src/plugins/remark-spans.ts` rewrites mdast html nodes to spans (vitest 13/13), `astro.config.mjs` wires the plugin, `hello.md` renders `<aside>` as `<span class="aside">` in the built HTML, empirical evidence in `notes/2026-05-12-gdoc-span-escaping.md`. Ready to start Phase 4a (Impl A — Fuzzy Anchors).
 Resume file: None
