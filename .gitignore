@@ -26,3 +26,4 @@ build/
 
 # Sub-agent transcripts (if any are written locally)
 .subagent-transcripts/
+.vercel

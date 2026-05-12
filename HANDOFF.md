@@ -37,9 +37,28 @@ curl -sf --max-time 5 \
   "https://www.googleapis.com/drive/v3/files/$DOC_ID?fields=version,modifiedTime" \
   -H "Authorization: Bearer $TOKEN" | grep -q '"version"' \
   && echo "[ok] drive version probe" || echo "[FAIL] drive version probe"
+
+# 4. Vercel CLI authed + project exists + env vars set
+# (Vercel CLI writes some output to stderr — use 2>&1 for both grep checks)
+vercel whoami >/dev/null 2>&1 \
+  && echo "[ok] vercel auth" || echo "[FAIL] vercel auth"
+vercel project ls 2>&1 | grep -q "^  docs-to-blog " \
+  && echo "[ok] vercel project" || echo "[FAIL] vercel project"
+vercel env ls 2>&1 | grep -q "ANTHROPIC_API_KEY" \
+  && echo "[ok] vercel env" || echo "[FAIL] vercel env"
 ```
 
 If any check fails, the autonomous run will fail too — fix before launching, not during.
+
+### About the runtime split (why `gdoc` doesn't need to "work on Vercel")
+
+Three environments touch this codebase. They don't overlap, so the pre-flight verifies each separately:
+
+- **Your local Mac** — where pre-flight runs and where the worktrees live. Has `gdoc`, `python3`, `vercel` CLI.
+- **GitHub Actions runner** (Ubuntu, the cron + `workflow_dispatch` target) — restores `token.json` from base64 secrets, installs `gdoc` + the Anthropic SDK, runs the orchestrator, commits artifacts (`anchors.yaml` / `decisions.md` / `generated.css`), and opens the PR. **All `gdoc`, Drive, and Anthropic SDK calls live here.**
+- **Vercel build runtime** — only runs `astro build` against the artifacts the orchestrator already produced. After P7 it also hosts the action API routes as Vercel serverless functions, which call the GitHub API for merge/close/dispatch. **Never runs `gdoc`. Never calls Anthropic at build time** — that already happened upstream in GH Actions.
+
+So checks 1–3 verify the GH Actions worldview (gdoc, Drive, Anthropic API). Check 4 verifies the deploy plumbing. There is no scenario where `gdoc` needs to "work on Vercel" — the artifacts have already been resolved by the time Vercel sees the repo.
 
 ### What about Google Docs going down mid-run?
 
@@ -64,6 +83,8 @@ chmod 600 ../docs-to-blog-A/.env ../docs-to-blog-B/.env
 ```
 
 (GSD's `.claude/` is committed, so both worktrees have it — no GSD re-install needed.)
+
+`.vercel/` is gitignored, so each worktree starts without a Vercel link. **That's fine** — the GitHub ⇄ Vercel integration auto-deploys on every push, so neither session needs `vercel link` to deploy. If a session wants CLI-level inspection (logs, env pull, manual `vercel --prod`), it can run `vercel link --yes --project docs-to-blog` inside its worktree.
 
 ---
 
