@@ -80,7 +80,7 @@ Plans:
 **Plans**: 1 plan
 
 Plans:
-- [ ] 04a-01: `sync/para_style_a.py` — `diff-match-patch` fuzzy matching, position fingerprints, Call A bounded transform, `anchors.yaml` state, confidence threshold + `anchors_review.yaml`, plugin anchor-reading extension
+- [x] 04a-01: `sync/para_style_a.py` — `diff-match-patch` fuzzy matching, position fingerprints, Call A bounded transform, `anchors.yaml` state, confidence threshold + `anchors_review.yaml`, plugin anchor-reading extension
 
 ---
 
@@ -158,8 +158,8 @@ Phases 4a and 4b run in parallel on separate branches and both merge before Phas
 |-------|----------------|--------|-----------|
 | 1. Foundations | 2/2 | Complete | 2026-05-12 |
 | 2. Fetch + CSS Pipeline | 2/2 | Complete | 2026-05-12 |
-| 3. Span Plugin | 0/1 | Not started | - |
-| 4a. Impl A — Fuzzy Anchors | 0/1 | Not started | - |
+| 3. Span Plugin | 1/1 | Complete | 2026-05-12 |
+| 4a. Impl A — Fuzzy Anchors | 1/1 | Complete | 2026-05-12 |
 | 4b. Impl B — Re-decide | 0/1 | Not started | - |
 | 5. CI/CD + PR Flow | 0/2 | Not started | - |
 | 6. A-vs-B Harness | 0/1 | Not started | - |
