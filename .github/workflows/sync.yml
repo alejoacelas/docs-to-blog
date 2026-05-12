@@ -1,0 +1,203 @@
+name: sync — daily Google Doc → blog
+
+# Cron-driven full pipeline. On a doc change, opens (or updates) a PR
+# on a fixed `sync/pending` branch so duplicates can't accumulate. Vercel's
+# GitHub integration handles preview deployments per-PR and production
+# deploys on merge to main — no deploy steps here.
+#
+# Schedule: cron interval is configured in project.toml ([sync].cron).
+# When changing it there, update the schedule expression below to match
+# and commit both — GitHub Actions reads the schedule from this file at
+# workflow-load time, not at runtime.
+
+on:
+  schedule:
+    # Mirror of project.toml [sync].cron (default: 09:03 UTC daily). When
+    # changing one, change both; see README.md "Changing the cron".
+    - cron: "3 9 * * *"
+  workflow_dispatch:
+
+# Cancel an in-flight run if a new one is queued — only one sync at a
+# time, and the latest doc state is what we want anyway.
+concurrency:
+  group: sync-pipeline
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    env:
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      DOC_URL: ${{ vars.DOC_URL || 'https://docs.google.com/document/d/1qAD1VRFk4VkfmMM3AnDDH1LUqe_O6PrrzSfGOlLVbPQ/edit' }}
+      LIBRARY_DOC_URL: ${{ vars.LIBRARY_DOC_URL || 'https://docs.google.com/document/d/1sPikfxprgeHnrDd9TINgzN3NHqsc3b7xZbPWg2h-Vrw/edit' }}
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      SYNC_BRANCH: sync/pending
+
+    steps:
+      - name: Checkout main with full history
+        uses: actions/checkout@v4
+        with:
+          # full history so `git show HEAD:...` works for prev-vs-new
+          # comparisons in para_style_a + diff_review
+          fetch-depth: 0
+          ref: main
+
+      - name: Restore gdoc OAuth state from secrets
+        env:
+          GDOC_TOKEN_JSON_B64: ${{ secrets.GDOC_TOKEN_JSON_B64 }}
+          GDOC_CREDENTIALS_JSON_B64: ${{ secrets.GDOC_CREDENTIALS_JSON_B64 }}
+        run: |
+          if [ -z "$GDOC_TOKEN_JSON_B64" ] || [ -z "$GDOC_CREDENTIALS_JSON_B64" ]; then
+            echo "::error::GDOC_TOKEN_JSON_B64 or GDOC_CREDENTIALS_JSON_B64 secret missing"
+            exit 1
+          fi
+          mkdir -p "$HOME/.config/gdoc/accounts/default"
+          printf '%s' "$GDOC_TOKEN_JSON_B64" | base64 -d > "$HOME/.config/gdoc/accounts/default/token.json"
+          printf '%s' "$GDOC_TOKEN_JSON_B64" | base64 -d > "$HOME/.config/gdoc/token.json"
+          printf '%s' "$GDOC_CREDENTIALS_JSON_B64" | base64 -d > "$HOME/.config/gdoc/credentials.json"
+          chmod 600 \
+            "$HOME/.config/gdoc/token.json" \
+            "$HOME/.config/gdoc/credentials.json" \
+            "$HOME/.config/gdoc/accounts/default/token.json"
+          python3 -c "import json,os; t=json.load(open(os.path.expanduser('~/.config/gdoc/accounts/default/token.json'))); assert t.get('refresh_token'), 'token.json missing refresh_token'"
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          enable-cache: true
+
+      - name: Set up Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "yarn"
+
+      - name: Install gdoc CLI
+        run: |
+          uv tool install "git+https://github.com/LucaDeLeo/gdoc.git"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Install Python deps
+        run: uv sync --frozen
+
+      - name: Install JS deps
+        run: yarn install --frozen-lockfile
+
+      - name: Run sync pipeline
+        id: sync
+        run: |
+          set -o pipefail
+          uv run python -m sync 2>&1 | tee sync-output.log
+
+      - name: Detect changes
+        id: changes
+        if: success()
+        run: |
+          git add -A
+          if git diff --cached --quiet; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Sync produced no file changes — nothing to PR."
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            git diff --cached --stat | tee -a "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Build the site (verify the change doesn't break the build)
+        if: success() && steps.changes.outputs.changed == 'true'
+        run: yarn build
+
+      - name: Open or update sync/pending PR
+        if: success() && steps.changes.outputs.changed == 'true'
+        env:
+          SYNC_BRANCH: ${{ env.SYNC_BRANCH }}
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          TIMESTAMP="$(date -u '+%Y-%m-%d %H:%M UTC')"
+          DOC_VERSION="$(python3 -c "import json; print(json.load(open('.sync-state.json'))['doc_version'])" 2>/dev/null || echo unknown)"
+          TITLE="sync: ${TIMESTAMP} — drive v${DOC_VERSION}"
+
+          VERDICT="$(cat .sync-verdict.json 2>/dev/null || echo '{}')"
+          AUTO_MERGE_OK="$(echo "$VERDICT" | python3 -c "import json,sys; v=json.load(sys.stdin); print(str(v.get('auto_merge_ok', False)).lower())")"
+          SAFE_TO_AUTO_MERGE="$(echo "$VERDICT" | python3 -c "import json,sys; v=json.load(sys.stdin); print(str(v.get('safe_to_auto_merge', False)).lower())")"
+          CONCERNS="$(echo "$VERDICT" | python3 -c "import json,sys; v=json.load(sys.stdin); c=v.get('concerns', []); print('\n'.join(f'- {x}' for x in c) or '(none)')")"
+          UPSTREAM_EXHAUSTED="$(echo "$VERDICT" | python3 -c "import json,sys; v=json.load(sys.stdin); print(str(v.get('upstream_retry_exhausted', False)).lower())")"
+
+          BODY_FILE="$(mktemp)"
+          cat > "$BODY_FILE" <<EOF
+          Automated daily sync of the source Google Doc.
+
+          **Call 4 (diff review) verdict**
+          - \`auto_merge_ok\`: \`${AUTO_MERGE_OK}\`
+          - \`upstream_retry_exhausted\`: \`${UPSTREAM_EXHAUSTED}\`
+          - \`safe_to_auto_merge\`: \`${SAFE_TO_AUTO_MERGE}\`
+
+          **Concerns**
+          ${CONCERNS}
+
+          **Diff summary**
+          \`\`\`
+          $(git diff --cached --stat | head -40)
+          \`\`\`
+
+          Logs and \`.sync-verdict.json\` are uploaded as workflow artefacts.
+          EOF
+
+          git commit -m "sync: ${TIMESTAMP} — drive v${DOC_VERSION}"
+
+          if git ls-remote --exit-code --heads origin "$SYNC_BRANCH" >/dev/null 2>&1; then
+            git push --force-with-lease origin "HEAD:$SYNC_BRANCH"
+            PR_NUMBER="$(gh pr list --head "$SYNC_BRANCH" --state open --json number --jq '.[0].number' || true)"
+            if [ -n "${PR_NUMBER:-}" ]; then
+              gh pr edit "$PR_NUMBER" --title "$TITLE" --body-file "$BODY_FILE"
+              gh pr comment "$PR_NUMBER" --body "Updated by run \`${GITHUB_RUN_ID}\` at ${TIMESTAMP}. Verdict: \`safe_to_auto_merge=${SAFE_TO_AUTO_MERGE}\`."
+              echo "PR_NUMBER=$PR_NUMBER" >> "$GITHUB_ENV"
+            else
+              gh pr create --base main --head "$SYNC_BRANCH" --title "$TITLE" --body-file "$BODY_FILE"
+              echo "PR_NUMBER=$(gh pr view "$SYNC_BRANCH" --json number --jq .number)" >> "$GITHUB_ENV"
+            fi
+          else
+            git push origin "HEAD:$SYNC_BRANCH"
+            gh pr create --base main --head "$SYNC_BRANCH" --title "$TITLE" --body-file "$BODY_FILE"
+            echo "PR_NUMBER=$(gh pr view "$SYNC_BRANCH" --json number --jq .number)" >> "$GITHUB_ENV"
+          fi
+
+      - name: Auto-merge gate
+        if: success() && steps.changes.outputs.changed == 'true'
+        run: |
+          set -euo pipefail
+          AUTO_MERGE_CFG="$(python3 -c "import tomllib; print(str(tomllib.load(open('project.toml','rb')).get('sync',{}).get('auto_merge', False)).lower())")"
+          SAFE="$(python3 -c "import json; print(str(json.load(open('.sync-verdict.json')).get('safe_to_auto_merge', False)).lower())")"
+          echo "project.toml auto_merge=${AUTO_MERGE_CFG}; safe_to_auto_merge=${SAFE}"
+          if [ "$AUTO_MERGE_CFG" = "true" ] && [ "$SAFE" = "true" ]; then
+            if [ -n "${PR_NUMBER:-}" ]; then
+              gh pr merge "$PR_NUMBER" --auto --squash --delete-branch
+              echo "::notice::Auto-merge requested for PR #${PR_NUMBER}."
+            fi
+          else
+            echo "::notice::Holding PR open for human review (auto_merge=${AUTO_MERGE_CFG}, safe_to_auto_merge=${SAFE})."
+          fi
+
+      - name: Upload diagnostic artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sync-diagnostics-${{ github.run_id }}
+          path: |
+            sync-output.log
+            .sync-verdict.json
+          if-no-files-found: ignore
+          retention-days: 14
