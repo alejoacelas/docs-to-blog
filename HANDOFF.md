@@ -1,89 +1,208 @@
-# Handoff prompt for the next Claude Code session
+# Handoff — two parallel Claude Code sessions (A and B)
 
-## Before you start the new session
+You're going to run **two independent CC sessions in two terminals**, each in its own git worktree. One builds **Implementation A** (anchors + Claude reviews diff); the other builds **Implementation B** (Claude decides every sync + decisions.md). They do not coordinate. Each builds the whole stack (P1 → P5 from PLAN § 9) on its own branch and pushes when done.
 
-Launch from this repo so the project-local GSD commands load:
-
-```bash
-cd /Users/alejo/code/tries/2026-05-12-docs-to-blog
-claude --dangerously-skip-permissions
-```
-
-`--dangerously-skip-permissions` is mandatory for the unattended run described below — without it, every tool call will prompt the user, defeating the purpose.
-
-## About `notes/` and `demo/` — may be outdated
-
-The research and earlier planning artifacts under `notes/` (including an earlier version of this handoff prompt at `notes/2026-05-12-gsd-handoff-prompt.md`) **may be outdated**. `PLAN.md` at the repo root has moved past them in places — for example, what `notes/` describes as a "fuzzy-first reconciler" and "bracket-span" syntax has since been replaced by:
-
-- a **two-track A/B prototype** for paragraph styling (anchors-plus-Claude vs Claude-decides-every-sync), and
-- **HTML-tag spans** (`<aside>text</aside>`) instead of bracket-spans.
-
-`demo/index.html` is a one-shot visual mockup produced before the A/B split and the HTML-tag span syntax. It is **not** the design spec — visual style now lives in the `styling` tab of the source Google Doc. Do not reproduce its specific colors, fonts, sample content, or notation.
-
-When research notes or the demo conflict with `PLAN.md`, **`PLAN.md` wins**. Cite the underlying findings (gdoc capabilities, stack survey, etc.) only when they inform an implementation choice; treat their planning recommendations as historical.
-
-## Paste this into the new session
+You (the human) come back when both branches are pushed and compare them yourself (P6 — explicit taste call, not delegated).
 
 ---
 
-I'm building **docs-to-blog**: a daily-synced static blog whose content lives in a Google Doc and whose styling is split between a `styling` tab in the Doc and a sidecar in this git repo. **`PLAN.md` at the repo root is the only authoritative document.** Everything you need to execute end-to-end is provisioned — see PLAN.md § 0 "Prepared resources".
+## 0. Pre-flight (~30 seconds, run once before launching either session)
 
-**Prepared for you (do not re-create or ask about these):**
-- Source Google Doc with body + `styling` tab — URL in `project.toml` and `.env`
-- Library Google Doc with gallery body + `styling` tab — URL in `project.toml` and `.env`
-- `~/.config/gdoc/token.json` (refresh-token-bearing) and `credentials.json` — locally authenticated
-- `ANTHROPIC_API_KEY` in `.env` (gitignored) and in the global `~/.config/credentials/.env`
-- GitHub remote `origin` set on `alejoacelas/docs-to-blog`; `gh` authenticated with `repo` + `workflow` scopes
-- Repo secrets `ANTHROPIC_API_KEY`, `GDOC_TOKEN_JSON_B64`, `GDOC_CREDENTIALS_JSON_B64` already set (`gh secret list`)
-- GitHub Pages enabled with `build_type: workflow`
-- `project.toml` — pipeline config (doc URLs, cron, fuzzy threshold, cost cap)
-- `.env` (local) and `.env.example` (committed)
-- `.claude/` — GSD installed locally for this repo
+These were already verified at handoff time, but re-run to confirm nothing drifted. If any line prints `[FAIL]`, fix it before launching the sessions.
 
-**Goal:** Build a working v1 fully autonomously. **I am not coming back to verify, approve, or unblock anything.** Run end-to-end and produce both implementation branches A and B for me to compare when I return.
+```bash
+cd /Users/alejo/code/tries/2026-05-12-docs-to-blog
+set -a; source .env; set +a
 
-**Operating rules:**
-1. **Never mock, stub, or sleep-until-tomorrow.** All resources are real and authenticated. If something is missing, exit non-zero — don't fake it.
+# 1. Anthropic API responds with the new key
+curl -sf --max-time 10 https://api.anthropic.com/v1/messages \
+  -H "x-api-key: $ANTHROPIC_API_KEY" \
+  -H "anthropic-version: 2023-06-01" \
+  -H "content-type: application/json" \
+  -d '{"model":"claude-haiku-4-5","max_tokens":4,"messages":[{"role":"user","content":"ok"}]}' \
+  | grep -q '"content"' && echo "[ok] anthropic" || echo "[FAIL] anthropic"
+
+# 2. gdoc CLI can read both docs
+gdoc cat "$DOC_URL" --plain 2>/dev/null | grep -q "Hello, docs-to-blog" \
+  && echo "[ok] gdoc source body" || echo "[FAIL] gdoc source body"
+gdoc cat "$DOC_URL" --tab styling --plain 2>/dev/null | grep -q -i "global\|tags" \
+  && echo "[ok] gdoc source styling tab" || echo "[FAIL] gdoc source styling tab"
+gdoc cat "$LIBRARY_DOC_URL" --plain 2>/dev/null | grep -q "style library" \
+  && echo "[ok] gdoc library" || echo "[FAIL] gdoc library"
+
+# 3. Drive version probe (the field the daily cron polls cheaply)
+TOKEN=$(python3 -c "import json; print(json.load(open('$HOME/.config/gdoc/token.json'))['token'])")
+DOC_ID="${DOC_URL##*/d/}"; DOC_ID="${DOC_ID%%/*}"
+curl -sf --max-time 5 \
+  "https://www.googleapis.com/drive/v3/files/$DOC_ID?fields=version,modifiedTime" \
+  -H "Authorization: Bearer $TOKEN" | grep -q '"version"' \
+  && echo "[ok] drive version probe" || echo "[FAIL] drive version probe"
+```
+
+If any check fails, the autonomous run will fail too — fix before launching, not during.
+
+### What about Google Docs going down mid-run?
+
+Real outages on `docs.googleapis.com` are rare (the [Google Workspace Status Dashboard](https://www.google.com/appsstatus/dashboard/) shows historical outages — typically minutes, not hours). The daily sync script the autonomous run writes should treat HTTP 5xx + network errors as retryable with exponential backoff (3 attempts, 1s/4s/16s); a hard failure after retries should exit non-zero, leaving the previous successful sync intact. There is no fully predictive check — only the pre-flight above + retry logic at run time.
+
+---
+
+## 1. Set up the two worktrees (run once)
+
+```bash
+cd /Users/alejo/code/tries/2026-05-12-docs-to-blog
+git worktree add ../docs-to-blog-A -b impl-a
+git worktree add ../docs-to-blog-B -b impl-b
+```
+
+The worktrees share the same `.git` directory but have independent working trees and branches. Each worktree carries the same starting files — including `PLAN.md`, `project.toml`, `.env` (yes, the gitignored .env is in each worktree because it's not tracked, you may need to copy it manually if `set -a; source .env` fails in the worktrees):
+
+```bash
+cp /Users/alejo/code/tries/2026-05-12-docs-to-blog/.env ../docs-to-blog-A/.env
+cp /Users/alejo/code/tries/2026-05-12-docs-to-blog/.env ../docs-to-blog-B/.env
+chmod 600 ../docs-to-blog-A/.env ../docs-to-blog-B/.env
+```
+
+(GSD's `.claude/` is committed, so both worktrees have it — no GSD re-install needed.)
+
+---
+
+## About `notes/` and `demo/` — may be outdated
+
+Files under `notes/` are intermediate research from earlier exploration and `demo/` is a one-shot visual mockup produced **before the A/B split, before the HTML-tag span syntax, and before the SDK-direct decision**. They contain useful underlying findings (gdoc capabilities, stack survey) but their planning recommendations are historical.
+
+When research notes or the demo conflict with `PLAN.md`, **`PLAN.md` wins**. Neither session should reproduce the demo's specific colors, fonts, sample content, or bracket-span notation.
+
+---
+
+## Operating rules (apply to both sessions)
+
+1. **Never mock, stub, or sleep-until-tomorrow.** All resources are real and authenticated (see PLAN § 0). If something is missing, exit non-zero.
 2. **PLAN.md is the source of truth.** Don't re-research what it decides. Cite notes when their findings inform implementation; ignore their recommendations.
-3. **The daily sync pipeline uses the Anthropic SDK directly — *not* Claude Code, not the `claude` CLI, not any agent harness.** Per PLAN § 1 (the "LLM execution model" row), every LLM step in `.github/workflows/sync.yml` is a bounded transform: known inputs in, structured output out, deterministic validators + bounded retries in our orchestrator code. Do not wire `claude -p` into sync.yml. *Building* the system with GSD/Claude Code is fine — *running* the pipeline through Claude Code is not.
-4. **Don't modify `demo/`** — it's reference-only.
+3. **The daily sync pipeline uses the Anthropic SDK directly — *not* Claude Code, not the `claude` CLI, not any agent harness.** Per PLAN § 1 (LLM execution model), every LLM step in `.github/workflows/sync.yml` is a bounded transform: structured input → structured output, deterministic validators + bounded retries in the orchestrator. Building *with* Claude Code/GSD is fine; the pipeline itself must not call `claude -p`.
+4. **Don't modify `demo/`** — reference-only.
 5. **PR policy:** LLM-produced styling changes (`styles/anchors.yaml` for Impl A; `styling/decisions.md` for Impl B) open a PR, never auto-merge.
-6. **Cost cap per sync run:** `[anchoring].max_cost_usd` in `project.toml` (defaults to $1.00). Track cost via Anthropic SDK response headers; abort if exceeded.
-7. **Do not pause for taste questions you cannot answer.** Pick the most defensible option, document the call, move on. The A vs B winner is the only decision I'll make after the run.
+6. **Cost cap per sync run:** `[anchoring].max_cost_usd` in `project.toml`. Track via Anthropic SDK response headers; abort if exceeded.
+7. **Don't pause for taste questions.** Pick the most defensible option, document the call, move on.
+8. **Each session stays on its own branch.** Do not touch `main`. Do not merge across branches.
 
-**Recommended sequence (the only thing you need to do):**
+---
+
+## Session A — Implementation A (anchors)
+
+**Terminal 1:**
+
+```bash
+cd /Users/alejo/code/tries/docs-to-blog-A
+claude --dangerously-skip-permissions
+```
+
+**Paste this:**
+
+---
+
+You are running **Implementation A** of docs-to-blog in this git worktree, on branch `impl-a`. A companion session is independently building Implementation B in `../docs-to-blog-B` on branch `impl-b`. **You never coordinate with it; do not read its files; do not push to its branch.**
+
+`PLAN.md` at the repo root is authoritative. Section 0 lists every prepared resource (Google Docs, OAuth, GitHub repo, Pages, secrets, .env). Section 3.A describes Implementation A specifically: anchors-yaml + Claude reviews the diff every sync (fuzzy matcher as pre-pass hint, Claude is the decider). Section 7 step 3a is your pipeline branch.
+
+**Your scope:** Build phases **P1, P2, P3, P4a, P5** end-to-end on branch `impl-a`. Push to `origin/impl-a`. **Do not build P4b or P6** — P4b is the other session's job; P6 is the user's taste call after both branches are pushed.
+
+**Constraints:**
+- All operating rules in `HANDOFF.md` apply. The pipeline uses the Anthropic SDK directly — no `claude -p` in `sync.yml`.
+- Set `[doc].implementation = "a"` in `project.toml` before pushing.
+- The cron in `sync.yml` should be active (`on: schedule`) so we can dogfood. Pages stays pointed at `main` until v1.1 pick — don't touch Pages config.
+- Fixtures in `tests/fixtures/day1/` and `tests/fixtures/day2/` (PLAN § 8.1) must pass for Implementation A.
+
+**Sequence (zero interaction expected between checkpoints):**
 
 ```
 /gsd-map-codebase
 /gsd-new-project --auto @PLAN.md
-/gsd-config         # set: mode=yolo, workflow.verifier=false, parallelization.enabled=true
-/gsd-autonomous
+/gsd-config        # mode=yolo, workflow.verifier=false, parallelization.enabled=true
+/gsd-autonomous    # configure it to build P1, P2, P3, P4a, P5 only — skip P4b and P6
 ```
 
-That's it. After `/gsd-autonomous` completes, the repo should have:
-- An Astro site building cleanly with the sample doc rendered
-- `branch-a` containing Implementation A (anchors.yaml + Claude reviews diff)
-- `branch-b` containing Implementation B (Claude decides every sync + decisions.md)
-- `.github/workflows/sync.yml` wired to repo secrets
-- A README with the 15-minute setup walkthrough (per PLAN § 12)
-- Comparison artifacts in `notes/comparison/` (or wherever P6 writes them)
+If `/gsd-autonomous` won't natively scope to a phase list, run the phases manually with `/gsd-plan-phase N --prd PLAN.md --skip-research --auto` → `/gsd-execute-phase N` for each of P1, P2, P3, P4a, P5 in order. Skip `/gsd-verify-work` between phases (the user is not coming back to verify).
 
-**Phase notes:**
-- PLAN.md § 9 splits phase 4 into **P4a (Impl A)** and **P4b (Impl B)** — independent, designed to be dispatched to separate agents in parallel. If `/gsd-autonomous` doesn't natively parallelize branches, run them as separate workstreams (`/gsd-workstreams`) or just serialize them — the end state is the same.
-- Repo secrets are already set; `.github/workflows/sync.yml` should reference them directly.
-- The `gsd-sdk` PATH-resolution warning at install time is known and non-blocking. Only act on it if a command actually fails.
+**Done condition:**
+- `git push origin impl-a` succeeded
+- `.github/workflows/sync.yml` exists and is valid YAML
+- `gh workflow run sync.yml --ref impl-a` succeeds end-to-end (manual dispatch smoke test)
+- `npm run build` (or yarn equivalent) produces a static site under `dist/`
+- Fixtures in `tests/fixtures/day{1,2}` pass
+- A `notes/comparison/A-summary.md` exists describing what got built and what to compare against B
 
-**First action:** `/gsd-map-codebase`, then proceed through the sequence above without stopping. Skip the post-`/gsd-new-project` roadmap-review pause — proceed straight to `/gsd-config` and then `/gsd-autonomous`.
+If you hit a genuine external outage (Anthropic API or Google Docs returning 5xx after retries), write `notes/run-incidents/A-<timestamp>.md` with the error and exit non-zero — do not wait.
+
+**First action:** `/gsd-map-codebase`, then proceed through the sequence above without pausing.
 
 ---
 
-## What I expect to come back to
+## Session B — Implementation B (decisions)
 
-- Both implementation branches built, tested with the fixture pairs in PLAN § 8, and pushed to GitHub.
-- A daily sync workflow scheduled and dry-runnable via `workflow_dispatch`.
-- A summary comment on a PR (or a `notes/comparison/SUMMARY.md`) explaining what the A vs B comparison looked like on the fixtures, so I can pick the v1.1 default.
-- The site live on GitHub Pages (or close to it — if Pages deploys fail for any reason, document why and move on; I'll fix when I'm back).
+**Terminal 2:**
 
-## If you absolutely must pause
+```bash
+cd /Users/alejo/code/tries/docs-to-blog-B
+claude --dangerously-skip-permissions
+```
 
-The only scenario where pausing is acceptable is: an external service is genuinely down (Google Docs API outage, Anthropic API outage) and retries don't fix it. In that case, document the failure in `notes/run-incidents/<timestamp>.md` and exit non-zero so I can see it when I return. Do not wait.
+**Paste this:**
+
+---
+
+You are running **Implementation B** of docs-to-blog in this git worktree, on branch `impl-b`. A companion session is independently building Implementation A in `../docs-to-blog-A` on branch `impl-a`. **You never coordinate with it; do not read its files; do not push to its branch.**
+
+`PLAN.md` at the repo root is authoritative. Section 0 lists every prepared resource (Google Docs, OAuth, GitHub repo, Pages, secrets, .env). Section 3.B describes Implementation B specifically: no anchors file; Claude reads the full new doc + styling tab + library + previous `styling/decisions.md` every sync, and produces a styled-markdown intermediate plus an updated `decisions.md`. Section 7 step 3b is your pipeline branch.
+
+**Your scope:** Build phases **P1, P2, P3, P4b, P5** end-to-end on branch `impl-b`. Push to `origin/impl-b`. **Do not build P4a or P6** — P4a is the other session's job; P6 is the user's taste call after both branches are pushed.
+
+**Constraints:**
+- All operating rules in `HANDOFF.md` apply. The pipeline uses the Anthropic SDK directly — no `claude -p` in `sync.yml`.
+- Set `[doc].implementation = "b"` in `project.toml` before pushing.
+- The cron in `sync.yml` should be active (`on: schedule`) so we can dogfood. Pages stays pointed at `main` until v1.1 pick — don't touch Pages config.
+- Fixtures in `tests/fixtures/day1/` and `tests/fixtures/day2/` (PLAN § 8.1) must pass for Implementation B.
+- The decisions file format: markdown narrative is the current default per PLAN § 6.B and § 10.5. If you find a compelling reason to use structured YAML instead, document the call in `notes/comparison/B-summary.md` and proceed — don't pause.
+
+**Sequence (zero interaction expected between checkpoints):**
+
+```
+/gsd-map-codebase
+/gsd-new-project --auto @PLAN.md
+/gsd-config        # mode=yolo, workflow.verifier=false, parallelization.enabled=true
+/gsd-autonomous    # configure it to build P1, P2, P3, P4b, P5 only — skip P4a and P6
+```
+
+If `/gsd-autonomous` won't natively scope to a phase list, run the phases manually with `/gsd-plan-phase N --prd PLAN.md --skip-research --auto` → `/gsd-execute-phase N` for each of P1, P2, P3, P4b, P5 in order. Skip `/gsd-verify-work` between phases.
+
+**Done condition:**
+- `git push origin impl-b` succeeded
+- `.github/workflows/sync.yml` exists and is valid YAML
+- `gh workflow run sync.yml --ref impl-b` succeeds end-to-end (manual dispatch smoke test)
+- `npm run build` (or yarn equivalent) produces a static site under `dist/`
+- Fixtures in `tests/fixtures/day{1,2}` pass
+- A `notes/comparison/B-summary.md` exists describing what got built and what to compare against A
+
+If you hit a genuine external outage (Anthropic API or Google Docs returning 5xx after retries), write `notes/run-incidents/B-<timestamp>.md` with the error and exit non-zero — do not wait.
+
+**First action:** `/gsd-map-codebase`, then proceed through the sequence above without pausing.
+
+---
+
+## What you (the human) come back to
+
+- `git branch -r` shows both `origin/impl-a` and `origin/impl-b` pushed
+- Both branches build cleanly (`npm run build` works in each worktree)
+- Both branches have a valid `.github/workflows/sync.yml` (verifiable with `gh workflow list --repo alejoacelas/docs-to-blog`)
+- `notes/comparison/A-summary.md` and `notes/comparison/B-summary.md` describe what each session built
+- `main` is untouched — both implementations live as candidates
+
+**Then you do P6 yourself:**
+
+1. Trigger both workflows manually against the same fixture (`gh workflow run sync.yml --ref impl-a` and `--ref impl-b`).
+2. Compare the resulting `anchors.yaml` (A) vs `decisions.md` (B) for clarity, inspectability, and accuracy.
+3. Compare daily costs in the Anthropic console.
+4. Pick a winner. Merge the chosen branch into `main` and update Pages source.
+5. Delete the loser branch (or keep it parked).
+
+The comparison artifacts in `notes/comparison/` should make this 15 minutes of skimming, not a fresh investigation.
