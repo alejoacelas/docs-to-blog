@@ -1,12 +1,13 @@
 // @ts-check
 import { defineConfig } from 'astro/config';
+import remarkSpans from './src/plugins/remark-spans.ts';
 
 // Static output works directly with Vercel's GitHub integration; no adapter needed.
-// Remark/rehype plugins are intentionally absent here — wired in Phases 3 and 4a.
+// remarkSpans (P3) rewrites `<tag>text</tag>` literals into `<span class="tag">…</span>`.
 export default defineConfig({
   output: 'static',
   markdown: {
-    remarkPlugins: [],
+    remarkPlugins: [remarkSpans],
     rehypePlugins: [],
   },
 });
