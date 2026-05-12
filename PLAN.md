@@ -98,7 +98,7 @@ The hard problem: how does a plain-prose paragraph become "the callout"? The sou
 - A repo file `styles/anchors.yaml` records, for each styled paragraph: a fuzzy fingerprint of the paragraph (a quote span, the heading it sits under, its ordinal, a content hash) and the class to apply.
 - **First sync of a doc:** Claude reads the doc + the styling tab, proposes initial anchors, and writes them.
 - **Every subsequent sync:** Claude is given (prev doc, new doc — or the diff, prev `anchors.yaml`). It updates anchors holistically: it can rewrite, delete, or add entries based on what changed. There is no silent orphan-fixing — every change passes through Claude.
-- A fuzzy matcher (diff-match-patch) is available to Claude as a tool / pre-pass to surface candidate matches cheaply, but Claude is the decider.
+- A fuzzy matcher (diff-match-patch) runs as a pre-pass to surface candidate matches cheaply; its output is fed into Claude's prompt as a hint. Claude is the decider.
 - At build time, the Astro plugin reads `anchors.yaml` and attaches `className` to matched paragraphs.
 
 Why prototype this: anchors are an inspectable, hand-editable artifact. A human can open `anchors.yaml` and see exactly which paragraph got which class. Smaller per-sync LLM context (diff + anchors, not the whole doc).
@@ -234,30 +234,79 @@ Markdown narrative chosen over structured YAML because the file's job is to be h
 
 ---
 
-## 7. Pipeline (the daily sync)
+## 7. LLM calls and the daily sync pipeline
 
-Shared steps 1–2; step 3 is where the two implementations diverge.
+Every LLM step is a **bounded transform** invoked through the Anthropic SDK directly — known inputs in, structured output out. There is no agent loop inside any call, no tool use mid-generation. All looping happens in the orchestrator, where it is fully inspectable.
+
+### 7.1 Shape of every LLM call
+
+1. The orchestrator assembles the call's inputs from disk. No exploration.
+2. It calls Claude once.
+3. **Deterministic validators** check the output (parse, schema, coverage, sanity).
+4. Optionally, a **review pass** — a second Claude call playing reviewer — checks soft properties that can't be expressed in code (intent preservation, stylistic consistency, agreement with the prose spec).
+5. If any check fails, the failing checks + the prior output are folded back into the prompt and the call is retried, bounded by max attempts.
+6. After max attempts: the orchestrator commits the last attempt anyway, opens the PR with a `needs-attention` label and a summary of the failing checks, and **never auto-merges** for that run.
+
+The model is invoked only where input is genuinely fuzzy. Anything mechanisable — fuzzy paragraph matching, CSS parsing, YAML schema, hashes, ordinals, markdown parsing — stays as plain code and either pre-runs to produce inputs for a call or post-runs as a validator.
+
+### 7.2 The four calls in v1
+
+**Call 1 — CSS generator.** Turns the prose definitions in the project `styling` tab (plus inherited library definitions) into `styles/generated.css`.
+
+- *Inputs.* Project styling tab text; library styling tab; existing `styles/manual.css` (so the generator doesn't duplicate or conflict with hand-written rules); previous `styles/generated.css` (so unchanged rules stay byte-stable).
+- *Output.* New `styles/generated.css`.
+- *Deterministic validators.* Parses as CSS; every named tag in the styling tab has a rule; no rules for tags absent from styling tab + library; class names match `[a-z][a-z0-9-]*`; no `@import` of external URLs.
+- *Review pass.* A second Claude call sees the prose definitions and the generated CSS; flags any tag whose CSS contradicts or omits a property the prose explicitly named.
+
+**Call 2 — Paragraph-styling reconciler, Implementation A.** Updates `styles/anchors.yaml` to reflect the new doc, given what changed since last sync.
+
+- *Inputs.* Previous doc body; new doc body; current `anchors.yaml`; styling tab; library styling tab; the fuzzy matcher's candidate matches for each existing anchor (as a hint, not a directive).
+- *Output.* New `anchors.yaml`.
+- *Deterministic validators.* Parses as YAML; every class referenced is defined in the styling tab or library; every `quote.exact` is a verbatim substring of the new doc; every `ordinal` is reachable (the Nth paragraph under that heading exists); `hash` matches the matched paragraph.
+- *Review pass.* A second Claude call sees (prev doc, new doc, prev anchors, new anchors) and flags (a) any previously styled paragraph that still exists in some form and silently lost its class, and (b) any class applied to a paragraph that doesn't match the style's prose description in the styling tab.
+
+**Call 3 — Paragraph-styling reconciler, Implementation B.** Produces the styled-markdown intermediate and the updated `styling/decisions.md`.
+
+- *Inputs.* New doc body; styling tab; library; previous `decisions.md`.
+- *Output.* Styled markdown (doc body with class hints attached) + new `decisions.md`.
+- *Deterministic validators.* Styled markdown parses; every class hint is defined in styling tab or library; every styled paragraph has a corresponding entry in `decisions.md`; every entry in `decisions.md` maps to a styled paragraph in the output.
+- *Review pass.* A second Claude call sees (styling tab, library, new decisions.md) and flags entries whose stated reasoning is thin, contradictory, or unmoored from how the styling tab describes that class.
+
+**Call 4 — Diff reviewer (final gate, both implementations).** Decides whether the run is safe to merge unattended.
+
+- *Inputs.* Yesterday's full output (markdown + artifact); today's full output; styling tab; the source doc diff.
+- *Output.* A structured verdict: `{ auto_merge_ok: bool, concerns: [string] }`.
+- *Deterministic validators.* Output parses as the expected schema.
+- *No nested review pass.* This *is* the review pass for the pipeline as a whole.
+- *Retries.* 1 only. If a clean verdict can't be produced, the orchestrator defaults `auto_merge_ok = false` and lets the human decide.
+
+Calls 1–3 retry up to 3 attempts each. Each retry receives the previous attempt's output plus the concrete list of failed validators and reviewer complaints, framed as *"your previous attempt had these issues; produce a corrected version."*
+
+### 7.3 What is *not* an LLM call
+
+- Fuzzy paragraph matching (Implementation A): `diff-match-patch` in plain code. Its output is an *input to* Call 2, not a tool Call 2 invokes.
+- CSS parsing, YAML schema validation, hash computation, ordinal counting, markdown parsing: stdlib or off-the-shelf libraries.
+- The auto-merge decision itself: the orchestrator combines Call 4's verdict with whether any upstream call exhausted retries.
+
+### 7.4 The daily sync, end to end
 
 ```
 1. Probe Drive version. If nothing changed: exit 0.
 
 2. Pull doc body, styling tab, library doc into the repo.
 
-3a. (Implementation A)
-    - Run fuzzy matcher pre-pass to flag candidate anchor matches.
-    - Run Claude on (prev doc, new doc, prev anchors.yaml, candidates).
-    - Claude rewrites anchors.yaml holistically.
+3a. (Implementation A) Run fuzzy matcher → candidate matches.
+    Invoke Call 2 → new anchors.yaml.
 
-3b. (Implementation B)
-    - Run Claude on (new doc, styling tab, library, prev decisions.md).
-    - Claude writes new decisions.md and the styled-markdown intermediate.
+3b. (Implementation B) Invoke Call 3 → styled markdown + new decisions.md.
 
-4. If styling tab or library changed: regenerate styles/generated.css via Claude.
+4. If styling tab or library changed: invoke Call 1 → new generated.css.
 
 5. Astro build → final HTML.
 
-6. If anything changed: open PR. Auto-merge only if pipeline.toml allows AND
-   Claude flagged nothing for review.
+6. Invoke Call 4 → verdict. If anything changed: open PR.
+   Auto-merge only if pipeline.toml allows AND Call 4 returned
+   auto_merge_ok=true AND no upstream call exhausted retries.
 ```
 
 ---

@@ -45,10 +45,11 @@ I'm building **docs-to-blog**: a daily-synced static blog whose content lives in
 **Operating rules:**
 1. **Never mock, stub, or sleep-until-tomorrow.** All resources are real and authenticated. If something is missing, exit non-zero — don't fake it.
 2. **PLAN.md is the source of truth.** Don't re-research what it decides. Cite notes when their findings inform implementation; ignore their recommendations.
-3. **Don't modify `demo/`** — it's reference-only.
-4. **PR policy:** Claude-produced styling changes (`styles/anchors.yaml` for Impl A; `styling/decisions.md` for Impl B) open a PR, never auto-merge.
-5. **Cost cap per sync run:** `[anchoring].max_cost_usd` in `project.toml` (defaults to $1.00).
-6. **Do not pause for taste questions you cannot answer.** Pick the most defensible option, document the call, move on. The A vs B winner is the only decision I'll make after the run.
+3. **The daily sync pipeline uses the Anthropic SDK directly — *not* Claude Code, not the `claude` CLI, not any agent harness.** Per PLAN § 1 (the "LLM execution model" row), every LLM step in `.github/workflows/sync.yml` is a bounded transform: known inputs in, structured output out, deterministic validators + bounded retries in our orchestrator code. Do not wire `claude -p` into sync.yml. *Building* the system with GSD/Claude Code is fine — *running* the pipeline through Claude Code is not.
+4. **Don't modify `demo/`** — it's reference-only.
+5. **PR policy:** LLM-produced styling changes (`styles/anchors.yaml` for Impl A; `styling/decisions.md` for Impl B) open a PR, never auto-merge.
+6. **Cost cap per sync run:** `[anchoring].max_cost_usd` in `project.toml` (defaults to $1.00). Track cost via Anthropic SDK response headers; abort if exceeded.
+7. **Do not pause for taste questions you cannot answer.** Pick the most defensible option, document the call, move on. The A vs B winner is the only decision I'll make after the run.
 
 **Recommended sequence (the only thing you need to do):**
 
