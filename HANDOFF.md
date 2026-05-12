@@ -1,6 +1,6 @@
 # Handoff — two parallel Claude Code sessions (A and B)
 
-You're going to run **two independent CC sessions in two terminals**, each in its own git worktree. One builds **Implementation A** (anchors + Claude reviews diff); the other builds **Implementation B** (Claude decides every sync + decisions.md). They do not coordinate. Each builds the whole stack (P1 → P5 from PLAN § 9) on its own branch and pushes when done.
+You're going to run **two independent CC sessions in two terminals**, each in its own git worktree. One builds **Implementation A** (anchors + Claude reviews diff); the other builds **Implementation B** (Claude decides every sync + decisions.md). They do not coordinate. Each builds the whole stack (P1 → P5 from PLAN § 10) on its own branch and pushes when done.
 
 You (the human) come back when both branches are pushed and compare them yourself (P6 — explicit taste call, not delegated).
 
@@ -111,7 +111,7 @@ You are running **Implementation A** of docs-to-blog in this git worktree, on br
 - All operating rules in `HANDOFF.md` apply. The pipeline uses the Anthropic SDK directly — no `claude -p` in `sync.yml`.
 - Set `[doc].implementation = "a"` in `project.toml` before pushing.
 - The cron in `sync.yml` should be active (`on: schedule`) so we can dogfood. Pages stays pointed at `main` until v1.1 pick — don't touch Pages config.
-- Fixtures in `tests/fixtures/day1/` and `tests/fixtures/day2/` (PLAN § 8.1) must pass for Implementation A.
+- Fixtures in `tests/fixtures/day1/` and `tests/fixtures/day2/` (PLAN § 9.1) must pass for Implementation A.
 
 **Sequence (zero interaction expected between checkpoints):**
 
@@ -161,8 +161,8 @@ You are running **Implementation B** of docs-to-blog in this git worktree, on br
 - All operating rules in `HANDOFF.md` apply. The pipeline uses the Anthropic SDK directly — no `claude -p` in `sync.yml`.
 - Set `[doc].implementation = "b"` in `project.toml` before pushing.
 - The cron in `sync.yml` should be active (`on: schedule`) so we can dogfood. Pages stays pointed at `main` until v1.1 pick — don't touch Pages config.
-- Fixtures in `tests/fixtures/day1/` and `tests/fixtures/day2/` (PLAN § 8.1) must pass for Implementation B.
-- The decisions file format: markdown narrative is the current default per PLAN § 6.B and § 10.5. If you find a compelling reason to use structured YAML instead, document the call in `notes/comparison/B-summary.md` and proceed — don't pause.
+- Fixtures in `tests/fixtures/day1/` and `tests/fixtures/day2/` (PLAN § 9.1) must pass for Implementation B.
+- The decisions file format: markdown narrative is the current default per PLAN § 6.B and § 11.5. If you find a compelling reason to use structured YAML instead, document the call in `notes/comparison/B-summary.md` and proceed — don't pause.
 
 **Sequence (zero interaction expected between checkpoints):**
 
