@@ -40,6 +40,11 @@ from sync.fetch import (  # noqa: E402
     write_body_markdown,
 )
 from sync.llm import estimate_cost_usd  # noqa: E402
+from sync.para_style_a import (  # noqa: E402
+    ANCHORS_PATH,
+    reconcile_from_disk,
+    write_anchors_artifacts,
+)
 
 
 def _log(event: str, **fields) -> None:
@@ -142,6 +147,55 @@ def main() -> int:
         needs_attention_reason=result.needs_attention_reason,
     )
 
+    # 4b. Call 2 — Paragraph-styling reconciler (Implementation A only).
+    # Per PLAN §7.4, the reconciler runs after fetch; the order vs. CSS
+    # generation doesn't matter for correctness — both consume disk
+    # outputs from fetch and produce committable artefacts.
+    total_cost = result.cost_usd
+    para_needs_attention = False
+    para_needs_attention_reason: list[str] = []
+    if cfg.doc.implementation == "a":
+        para_result = reconcile_from_disk(
+            new_doc=post_path.read_text(),
+            project_styling=project_styling,
+            library_styling=library_styling,
+            post_path=post_path,
+            fuzzy_threshold=cfg.anchoring.fuzzy_threshold,
+            anchors_path=ANCHORS_PATH,
+        )
+        total_cost += para_result.cost_usd
+
+        # Cost-cap check after the reconciler too.
+        cost_cap = cfg.anchoring.max_cost_usd
+        if total_cost >= cost_cap * 0.5:
+            _log(
+                "cost_warning",
+                spent_usd=round(total_cost, 6),
+                cap_usd=cost_cap,
+            )
+        if total_cost > cost_cap:
+            print(
+                f"cost cap exceeded after reconciler: spent ${total_cost:.4f}, cap ${cost_cap:.2f}",
+                file=sys.stderr,
+            )
+            raise SystemExit(1)
+
+        anchors_path, review_path = write_anchors_artifacts(para_result)
+        _log(
+            "wrote_anchors",
+            path=str(anchors_path.relative_to(Path.cwd())),
+            review_path=(
+                str(review_path.relative_to(Path.cwd())) if review_path else None
+            ),
+            anchor_count=len(para_result.anchors),
+            attempts=para_result.attempts,
+            cost_usd=round(para_result.cost_usd, 6),
+            needs_attention=para_result.needs_attention,
+            review_concerns=para_result.review_concerns,
+        )
+        para_needs_attention = para_result.needs_attention
+        para_needs_attention_reason = para_result.needs_attention_reason
+
     # 5. Save state
     new_state = SyncState(
         doc_version=new_doc_version,
@@ -155,7 +209,16 @@ def main() -> int:
     )
 
     elapsed = round(time.time() - started, 3)
-    _log("done", elapsed_sec=elapsed, total_cost_usd=round(result.cost_usd, 6))
+    _log(
+        "done",
+        elapsed_sec=elapsed,
+        total_cost_usd=round(total_cost, 6),
+        needs_attention=result.needs_attention or para_needs_attention,
+        needs_attention_reason=[
+            *result.needs_attention_reason,
+            *para_needs_attention_reason,
+        ],
+    )
     return 0
 
 
