@@ -5,14 +5,14 @@
 See: .planning/PROJECT.md (updated 2026-05-12)
 
 **Core value:** The author edits the Google Doc; the published site reflects those edits the next morning, styled correctly, with no manual intervention required.
-**Current focus:** Phase 6 — A-vs-B Comparison Harness (Phase 5 complete on this branch)
+**Current focus:** Push complete — waiting on B branch and user's P6 comparison.
 
 ## Current Position
 
 Phase: 5 of 7 (CI/CD + PR Flow) — complete on `feat/impl-a-anchors`
 Plan: 2 of 2 in current phase
-Status: Complete on this branch (Implementation A side only — B branch ships its own copy)
-Last activity: 2026-05-13 — Phase 5 complete; `sync/diff_review.py` (Call 4) bounded transform with 1 retry + tolerant JSON extraction + schema validators; wired into `sync/__main__.py` after css_gen + para_style_a with upstream-retry-exhaustion tracking; verdict written to `.sync-verdict.json` (gitignored); `.github/workflows/sync.yml` cron + workflow_dispatch + fixed `sync/pending` branch + Vercel auto-deploy via GitHub integration + auto-merge gate; `README.md` 15-minute setup guide; actionlint clean; 78 pytest + 21 vitest cases all green
+Status: Implementation A build done; fixtures (PLAN §9.1) + A-summary committed; branch pushed to origin
+Last activity: 2026-05-13 — Added `tests/fixtures/day{1,2}/` corpus per PLAN §9.1 (day1: feature-quote + aside + inline `<aside>` span; day2: typo fix, inserted paragraph, rewritten span-bearing paragraph, rewritten callout). `tests/test_fixtures.py` runs the deterministic validators against the hand-authored goldens (12 cases). `notes/comparison/A-summary.md` written for the P6 hand-off. 90 pytest + 21 vitest all green. astro check + astro build clean.
 
 Progress: [██████░░░░] 71%
 
@@ -64,6 +64,7 @@ Recent decisions affecting current work:
 - P5: Auto-merge gate combines three booleans: `project.toml [sync].auto_merge` (author opt-in) AND Call 4's `auto_merge_ok` AND `NOT upstream_retry_exhausted` (CI-06). The combined verdict is persisted to `.sync-verdict.json` (gitignored) so the workflow only reads one bool.
 - P5: Single fixed `sync/pending` branch prevents duplicate PRs across cron ticks. Existing branch → force-push + edit existing PR + drop a comment with the new run ID; missing branch → create + open. PR body always carries the latest verdict.
 - P5: The cron expression lives in two places — `project.toml [sync].cron` (consumed by the pipeline) and `.github/workflows/sync.yml` `schedule.cron` (consumed by GH Actions at workflow-load time). README documents the requirement to keep them in sync.
+- Final: `tests/fixtures/day{1,2}/` corpus is hermetic (no live Claude calls); goldens are hand-authored and verified by the deterministic validators (`validate_anchors`, `validate_css`). Fuzzy-matcher coverage tested by asserting the day-1 aside anchor relocates to day-2's typo-fixed paragraph. Snapshot test is for regression detection, not for verifying Claude reproduces the goldens.
 
 ### Pending Todos
 
@@ -82,5 +83,5 @@ None.
 ## Session Continuity
 
 Last session: 2026-05-13
-Stopped at: Phase 5 complete on `feat/impl-a-anchors`. `sync/diff_review.py` is the Call 4 bounded transform — single Claude call, tolerant JSON extraction, deterministic schema validation, 1 retry, defaults `auto_merge_ok=false` on parse exhaustion (17 pytest cases). `sync/__main__.py` runs Call 4 after css_gen + para_style_a, tracks whether either upstream call hit a needs-attention state (CI-06), and writes `.sync-verdict.json` for the workflow to consume. `.github/workflows/sync.yml` is the daily cron: restores gdoc OAuth from base64 secrets to `~/.config/gdoc/accounts/default/token.json` per preflight's path, installs uv + node + gdoc CLI + Python + JS deps, runs `uv run python -m sync`, captures `sync-output.log`, force-pushes to a fixed `sync/pending` branch, edits-or-creates the PR with the verdict in the body, gates auto-merge on `project.toml [sync].auto_merge` ∧ `safe_to_auto_merge`. Vercel's GitHub integration handles preview deploys (PRs) and production deploys (merges to main) — no custom deploy step. `README.md` is the 15-minute setup guide (forks, secrets, project.toml reference, A-vs-B toggle, troubleshooting). `actionlint` clean. 78 pytest + 21 vitest all green. Smoke run via `gh workflow run sync.yml --ref feat/impl-a-anchors` deferred until post-push (the branch isn't on origin yet).
+Stopped at: Implementation A build done. Added `tests/fixtures/day{1,2}/` per PLAN §9.1 (day1: feature-quote callout, aside reflective tangent, inline `<aside>` span; day2: typo fix on the aside, an inserted paragraph that shifts later ordinals, a rewritten paragraph that preserves its inline span, and a rewritten callout). `tests/test_fixtures.py` is the snapshot harness — 12 cases asserting the hand-authored goldens parse and pass the deterministic validators (`validate_anchors`, `validate_css`), plus a fuzzy-matcher coverage test that proves the day-1 aside anchor relocates to day-2's typo-fixed paragraph. `notes/comparison/A-summary.md` is the P6 hand-off — pipeline diagram, file map, differentiating-artifact paragraph, smoke-cost characteristics, pros/cons, comparison questions, and a phase-grouped commit log. 90 pytest + 21 vitest all green. astro check + astro build clean. Branch pushed to `origin/feat/impl-a-anchors`.
 Resume file: None
