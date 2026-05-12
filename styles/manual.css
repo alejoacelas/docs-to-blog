@@ -1,0 +1,18 @@
+/* Author-controlled base styles. Edit freely; the sync pipeline never touches this file. */
+
+:root {
+  --max-width: 42rem;
+  --body-font: ui-serif, Georgia, 'Times New Roman', serif;
+}
+
+body {
+  font-family: var(--body-font);
+  max-width: var(--max-width);
+  margin: 2rem auto;
+  padding: 0 1rem;
+  line-height: 1.6;
+}
+
+a {
+  color: inherit;
+}
