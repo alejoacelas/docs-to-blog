@@ -1,15 +1,15 @@
 """Top-level entry point for the daily sync.
 
-Order (per PLAN.md §7.4 + Phase 2 success criteria):
+Order (per PLAN.md §7.4):
 
   1. Load config + creds. Hard-fail on missing before any API call.
   2. Probe Drive version. Exit 0 if both source and library are unchanged.
   3. Pull doc body + styling tab + library doc.
   4. Regenerate styles/generated.css via Call 1 (sync.css_gen).
+  4b. (Implementation A only) Reconcile anchors via Call 2.
+  4c. Run Call 4 (diff_review) final gate; persist verdict to
+      .sync-verdict.json for the workflow's auto-merge step.
   5. Save the new Drive versions to .sync-state.json.
-
-Phase 2 stops at the CSS step. Phases 3+ extend this entry point with
-the span plugin and the paragraph-styling reconcilers.
 
 Each step emits a structured JSON log line to stdout. Errors print a
 descriptive message to stderr before exiting non-zero.
@@ -29,6 +29,7 @@ load_dotenv()
 
 from sync.config import load_config  # noqa: E402
 from sync.css_gen import generate_css, write_generated_css  # noqa: E402
+from sync.diff_review import review_diff, write_verdict_file  # noqa: E402
 from sync.fetch import (  # noqa: E402
     SyncState,
     drive_version,
@@ -43,9 +44,38 @@ from sync.llm import estimate_cost_usd  # noqa: E402
 from sync.para_style_a import (  # noqa: E402
     ANCHORS_PATH,
     REPO_ROOT,
+    read_prev_body_from_git,
     reconcile_from_disk,
     write_anchors_artifacts,
 )
+
+VERDICT_PATH = REPO_ROOT / ".sync-verdict.json"
+
+
+def _git_show_head(path: Path) -> str:
+    """Return the HEAD-version contents of `path`, or "" on miss.
+
+    Used to assemble the prev-vs-new comparison for Call 4.
+    """
+    import subprocess
+
+    try:
+        rel = path.resolve().relative_to(REPO_ROOT)
+    except ValueError:
+        rel = path
+    try:
+        result = subprocess.run(
+            ["git", "show", f"HEAD:{rel}"],
+            capture_output=True,
+            text=True,
+            check=False,
+            cwd=REPO_ROOT,
+        )
+    except FileNotFoundError:
+        return ""
+    if result.returncode != 0:
+        return ""
+    return result.stdout
 
 
 def _log(event: str, **fields) -> None:
@@ -208,6 +238,59 @@ def main() -> int:
             astro_cache.unlink()
             _log("invalidated_astro_cache", path=str(astro_cache.relative_to(Path.cwd())))
 
+    # 4c. Call 4 — diff reviewer (final gate). Always runs after the
+    # upstream calls, regardless of whether they hit a needs-attention
+    # state. Per CI-06 the workflow's auto-merge gate combines this
+    # verdict with whether any upstream call exhausted retries.
+    upstream_exhausted = (
+        bool(result.needs_attention) or bool(para_needs_attention)
+    )
+    prev_body = read_prev_body_from_git(post_path)
+    if cfg.doc.implementation == "a":
+        artifact_label = "anchors.yaml"
+        new_artifact = ANCHORS_PATH.read_text() if ANCHORS_PATH.exists() else ""
+        prev_artifact = _git_show_head(ANCHORS_PATH)
+    else:
+        # B-side artifacts don't exist on this branch yet; this branch
+        # ships A only. Phase 6 picks the winner; until then the
+        # workflow on this branch always runs Implementation A.
+        artifact_label = "decisions.md"
+        new_artifact = ""
+        prev_artifact = ""
+
+    review_result = review_diff(
+        prev_markdown=prev_body,
+        new_markdown=post_path.read_text(),
+        prev_artifact=prev_artifact,
+        new_artifact=new_artifact,
+        styling_text=project_styling,
+        artifact_label=artifact_label,
+    )
+    total_cost += review_result.cost_usd
+    if total_cost > cfg.anchoring.max_cost_usd:
+        # Cost cap is advisory at this point — the gate already ran. Log
+        # but do not abort: the artefacts are valid and committable.
+        _log(
+            "cost_warning",
+            spent_usd=round(total_cost, 6),
+            cap_usd=cfg.anchoring.max_cost_usd,
+            note="cost cap exceeded after diff_review; not aborting (gate already ran)",
+        )
+    write_verdict_file(
+        review_result,
+        upstream_retry_exhausted=upstream_exhausted,
+        path=VERDICT_PATH,
+    )
+    _log(
+        "wrote_verdict",
+        path=str(VERDICT_PATH.relative_to(Path.cwd())),
+        auto_merge_ok=review_result.auto_merge_ok,
+        concerns=review_result.concerns,
+        upstream_retry_exhausted=upstream_exhausted,
+        safe_to_auto_merge=review_result.auto_merge_ok and not upstream_exhausted,
+        cost_usd=round(review_result.cost_usd, 6),
+    )
+
     # 5. Save state
     new_state = SyncState(
         doc_version=new_doc_version,
@@ -221,6 +304,12 @@ def main() -> int:
     )
 
     elapsed = round(time.time() - started, 3)
+    verdict_summary = {
+        "auto_merge_ok": review_result.auto_merge_ok,
+        "concerns": review_result.concerns,
+        "upstream_retry_exhausted": upstream_exhausted,
+        "safe_to_auto_merge": review_result.auto_merge_ok and not upstream_exhausted,
+    }
     _log(
         "done",
         elapsed_sec=elapsed,
@@ -230,6 +319,7 @@ def main() -> int:
             *result.needs_attention_reason,
             *para_needs_attention_reason,
         ],
+        verdict=verdict_summary,
     )
     return 0
 
