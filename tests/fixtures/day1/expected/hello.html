@@ -1,0 +1,25 @@
+<!--
+Representative HTML snippets (post-remark transform) for tests/fixtures/day1.
+
+These are not a full Astro build — they're hand-authored fragments that
+encode the expected output for the two key transforms in Implementation A:
+
+  1. remark-spans converts `<aside>text</aside>` spans inside a paragraph
+     into `<span class="aside">text</span>`.
+  2. remark-anchors injects `class="feature-quote"` / `class="aside"` on
+     the paragraph wrappers identified by anchors.yaml.
+
+The fixture harness asserts these snippets are substrings of the built
+HTML (or of the mdast-rendered output if we transform without a full
+Astro build). Whitespace and surrounding markup are tolerated.
+-->
+
+<!-- (1) Span transform on Background paragraph 2 -->
+<span class="aside">actually disagreed
+about something</span>
+
+<!-- (2) Anchor injection on Background paragraph 3 (feature-quote) -->
+<p class="feature-quote">
+
+<!-- (3) Anchor injection on "What I keep getting wrong" paragraph 2 (aside) -->
+<p class="aside">

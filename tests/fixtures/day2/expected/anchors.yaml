@@ -1,0 +1,15 @@
+paragraphs:
+- class: feature-quote
+  anchor:
+    quote:
+      exact: It turns out the slowness was load-bearing.
+    heading: Background
+    ordinal: 4
+    hash: 67365bfa
+- class: aside
+  anchor:
+    quote:
+      exact: A line I want to keep in front of me, taped to my monitor
+    heading: What I keep getting wrong
+    ordinal: 2
+    hash: 0e8f1cd6

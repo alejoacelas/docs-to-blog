@@ -1,0 +1,21 @@
+<!--
+Representative HTML snippets (post-remark transform) for tests/fixtures/day2.
+
+Same shape as day1's expected/hello.html — hand-authored substrings the
+fixture harness asserts are present in any reasonable build of the
+day-2 doc. The whole point of the day-2 fixture is that the SAME
+substrings still appear even after the four edits: the span survives a
+prose rewrite, the anchor reattaches across an ordinal shift, and the
+typo-fixed paragraph still gets its class.
+-->
+
+<!-- (1) Span transform survives the rewritten host paragraph
+        (Background paragraph 3 on day 2; was paragraph 2 on day 1). -->
+<span class="aside">actually disagreed
+about something</span>
+
+<!-- (2) Anchor reattaches to the rewritten callout, now at Background ord=4. -->
+<p class="feature-quote">
+
+<!-- (3) Anchor sticks on the typo-fixed paragraph at the same (heading, ord). -->
+<p class="aside">

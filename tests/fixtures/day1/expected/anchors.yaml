@@ -1,0 +1,15 @@
+paragraphs:
+- class: feature-quote
+  anchor:
+    quote:
+      exact: The point is not that the tool was bad.
+    heading: Background
+    ordinal: 3
+    hash: d69b8f47
+- class: aside
+  anchor:
+    quote:
+      exact: A line I want to keep in front of me, taped to the monitor
+    heading: What I keep getting wrong
+    ordinal: 2
+    hash: d935704c
