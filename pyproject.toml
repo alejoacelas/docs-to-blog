@@ -1,0 +1,15 @@
+[project]
+name = "docs-to-blog-sync"
+version = "0.1.0"
+description = "Python sync pipeline for the docs-to-blog Astro site."
+requires-python = ">=3.11"
+dependencies = [
+    "anthropic>=0.40.0",
+    "diff-match-patch>=20230430",
+    "pyyaml>=6.0",
+    "google-api-python-client>=2.0",
+    "google-auth>=2.0",
+]
+
+[tool.uv]
+package = false

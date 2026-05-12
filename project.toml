@@ -16,13 +16,18 @@ library_url = "https://docs.google.com/document/d/1sPikfxprgeHnrDd9TINgzN3NHqsc3
 # The exact tab title within the source doc that holds prose styling rules.
 styling_tab_title = "styling"
 
+# Which paragraph-styling implementation to use. Options: "a" (fuzzy anchors)
+# or "b" (re-decide every sync). Phase 6 selects a winner; until then both
+# branches exist in parallel.
+implementation = "a"
+
 [sync]
 # Cron expression for the daily sync (UTC). Default: 09:03 UTC.
 cron = "3 9 * * *"
 
 # When Claude resolves an orphan anchor, should we auto-merge the PR or
 # always wait for a human? v1 default: always human-review.
-auto_merge_orphans = false
+auto_merge = false
 
 [anchoring]
 # diff-match-patch fuzzy threshold for quote-based anchor matching. Closer to
@@ -36,6 +41,7 @@ max_orphan_resolution_turns = 6
 max_cost_usd = 1.00
 
 [deploy]
-# How the rendered site is published. Options: "github-pages", "cloudflare-pages".
-# v1 default: github-pages, deployed via the same daily workflow.
-target = "github-pages"
+# How the rendered site is published. Options: "vercel", "cloudflare-pages",
+# "github-pages". v1 default: vercel — linked via the GitHub integration so
+# pushes to main auto-deploy and PRs get preview URLs.
+target = "vercel"
