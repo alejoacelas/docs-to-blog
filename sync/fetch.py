@@ -45,6 +45,13 @@ GDOC_CREDENTIALS_PATH = Path(
 
 DOC_ID_RE = re.compile(r"/document/d/([a-zA-Z0-9_-]+)")
 
+# gdoc's markdown export escapes every `<` and `>` as `\<` / `\>`.
+# We unescape only when they wrap a CSS-class-shaped tagname (same
+# `[a-z][a-z0-9-]*` shape the CSS validators enforce in P2). Stray
+# `\<` or `\>` in author prose (e.g. an inequality) is left alone.
+# See notes/2026-05-12-gdoc-span-escaping.md for empirical evidence.
+SPAN_ESCAPE_RE = re.compile(r"\\<(/?[a-z][a-z0-9-]*)\\>")
+
 
 @dataclass(frozen=True)
 class SyncState:
@@ -123,7 +130,18 @@ def pull_doc_body(url: str, styling_tab_title: str = "styling") -> str:
     """
     raw = _run_gdoc(["cat", "--quiet", url])
     body = _slice_before_styling_heading(raw, styling_tab_title)
-    return body
+    return unescape_span_tags(body)
+
+
+def unescape_span_tags(markdown: str) -> str:
+    """Reverse gdoc's backslash-escape of span-tag angle brackets.
+
+    `gdoc cat` emits `\\<aside\\>...\\</aside\\>` for what was typed as
+    `<aside>...</aside>` in the source doc. The remark plugin (P3) expects
+    canonical `<tag>...</tag>` syntax; unescaping here keeps the markdown
+    on disk readable and the plugin platform-agnostic.
+    """
+    return SPAN_ESCAPE_RE.sub(r"<\1>", markdown)
 
 
 def _slice_before_styling_heading(markdown: str, styling_tab_title: str) -> str:
