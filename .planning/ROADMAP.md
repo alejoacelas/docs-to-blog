@@ -8,7 +8,7 @@ Phases 4a and 4b run in parallel on separate branches (`feat/impl-a-anchors`, `f
 
 ## Phases
 
-- [ ] **Phase 1: Foundations** — Repo scaffold, `project.toml` schema, Astro site shell deployed to Vercel
+- [x] **Phase 1: Foundations** — Repo scaffold, `project.toml` schema, Astro site shell deployed to Vercel
 - [ ] **Phase 2: Fetch + CSS Pipeline** — `sync/fetch.py`, change detection, `sync/css_gen.py` (Call 1), normalised `styles/generated.css`
 - [ ] **Phase 3: Span Plugin** — Remark plugin: `<tag>text</tag>` → `<span class="tag">text</span>` in built HTML
 - [ ] **Phase 4a: Impl A — Fuzzy Anchors** — `sync/para_style_a.py` (Call 2), `styles/anchors.yaml`, plugin reads anchors at build time
@@ -30,8 +30,8 @@ Phases 4a and 4b run in parallel on separate branches (`feat/impl-a-anchors`, `f
 **Plans**: 2 plans
 
 Plans:
-- [ ] 01-01: Astro v5 site scaffold — content collections, human-readable post URLs, `styles/generated.css` import in layout
-- [ ] 01-02: `project.toml` config schema, startup validator, and Vercel project link
+- [x] 01-01: Astro v5 site scaffold — content collections, human-readable post URLs, `styles/generated.css` import in layout
+- [x] 01-02: `project.toml` config schema, startup validator, and Vercel project link
 
 ---
 
@@ -156,7 +156,7 @@ Phases 4a and 4b run in parallel on separate branches and both merge before Phas
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Foundations | 0/2 | Not started | - |
+| 1. Foundations | 2/2 | Complete | 2026-05-12 |
 | 2. Fetch + CSS Pipeline | 0/2 | Not started | - |
 | 3. Span Plugin | 0/1 | Not started | - |
 | 4a. Impl A — Fuzzy Anchors | 0/1 | Not started | - |
