@@ -9,7 +9,7 @@ Phases 4a and 4b run in parallel on separate branches (`feat/impl-a-anchors`, `f
 ## Phases
 
 - [x] **Phase 1: Foundations** — Repo scaffold, `project.toml` schema, Astro site shell deployed to Vercel
-- [ ] **Phase 2: Fetch + CSS Pipeline** — `sync/fetch.py`, change detection, `sync/css_gen.py` (Call 1), normalised `styles/generated.css`
+- [x] **Phase 2: Fetch + CSS Pipeline** — `sync/fetch.py`, change detection, `sync/css_gen.py` (Call 1), normalised `styles/generated.css`
 - [ ] **Phase 3: Span Plugin** — Remark plugin: `<tag>text</tag>` → `<span class="tag">text</span>` in built HTML
 - [ ] **Phase 4a: Impl A — Fuzzy Anchors** — `sync/para_style_a.py` (Call 2), `styles/anchors.yaml`, plugin reads anchors at build time
 - [ ] **Phase 4b: Impl B — Re-decide Every Sync** — `sync/para_style_b.py` (Call 3), `styling/decisions.md` as live prompt input
@@ -47,8 +47,8 @@ Plans:
 **Plans**: 2 plans
 
 Plans:
-- [ ] 02-01: `sync/fetch.py` — `gdoc cat` body export, Docs API tab/library pull, Drive version check with early-exit no-op, OAuth hard-fail on auth error
-- [ ] 02-02: `sync/css_gen.py` — Call 1 bounded transform, CSS normalisation (sort properties, strip comments), CSS validator, retry loop, ERR logging
+- [x] 02-01: `sync/fetch.py` — `gdoc cat` body export (sliced before styling tab), `gdoc cat --tab --plain` for tab/library content (v1 simplification — Docs API direct call deferred), Drive version check via google-api-python-client + gdoc OAuth token, early-exit no-op when neither source nor library version has advanced
+- [x] 02-02: `sync/css_gen.py` — Call 1 bounded transform via Anthropic SDK direct, deterministic validators (tinycss2 parse + brace balance, tag coverage, class-name shape `[a-z][a-z0-9-]*`, no external @import), optional review pass, retry ≤ 3 with failure folded back, CSS normalisation (alphabetised properties, comments stripped), structured JSON logging. `sync/__main__.py` is the top-level entry point.
 
 ---
 
@@ -157,7 +157,7 @@ Phases 4a and 4b run in parallel on separate branches and both merge before Phas
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Foundations | 2/2 | Complete | 2026-05-12 |
-| 2. Fetch + CSS Pipeline | 0/2 | Not started | - |
+| 2. Fetch + CSS Pipeline | 2/2 | Complete | 2026-05-12 |
 | 3. Span Plugin | 0/1 | Not started | - |
 | 4a. Impl A — Fuzzy Anchors | 0/1 | Not started | - |
 | 4b. Impl B — Re-decide | 0/1 | Not started | - |
