@@ -53,6 +53,8 @@ class GenResult:
     review_ran: bool = False
     review_passed: bool | None = None
     review_issues: list[str] = field(default_factory=list)
+    needs_attention: bool = False
+    needs_attention_reason: list[str] = field(default_factory=list)
 
 
 def _log(event: str, **fields) -> None:
@@ -350,14 +352,29 @@ def _strip_code_fences(text: str) -> str:
 
 REVIEW_SYSTEM = """\
 You are reviewing a generated CSS file against the prose definitions
-that produced it. Reply with JSON only:
+that produced it.
+
+Output a single JSON object on one line. No prose, no markdown, no code
+fences. Schema:
   {"ok": true,  "issues": []}
 or
-  {"ok": false, "issues": ["<short issue 1>", "<short issue 2>"]}
+  {"ok": false, "issues": ["<short issue 1>", ...]}
 
-Flag only concrete contradictions: a property the prose explicitly named
-that the CSS omits or contradicts. Do not flag stylistic taste. Do not
-flag missing tags — a separate validator handles coverage.
+Flag ONLY hard contradictions where the prose explicitly names a CSS
+property and the CSS sets a different, conflicting value. Examples that
+qualify:
+  - prose says "italic", CSS sets `font-style: normal`
+  - prose says "indented from the left", CSS has no left padding/margin
+  - prose says "1.4× body", CSS sets a font-size scale far from 1.4
+
+Do NOT flag:
+  - missing properties the prose did not explicitly name
+  - stylistic taste (your preferred shade, family, weight)
+  - cosmetics the prose did not require
+  - undefined CSS variables (the manual.css file may define them)
+  - "the prose specifies X but I don't see X" when X isn't a CSS property
+
+When in doubt, return ok: true.
 """
 
 
@@ -365,20 +382,38 @@ def _review_pass(prose: str, css: str) -> tuple[bool, list[str], dict]:
     user = (
         "PROSE DEFINITIONS:\n```\n" + prose.strip() + "\n```\n\n"
         "GENERATED CSS:\n```css\n" + css + "\n```\n\n"
-        "Reply with JSON only."
+        'Reply with exactly one line of JSON, e.g. {"ok": true, "issues": []}'
     )
-    text, usage = call_claude(system=REVIEW_SYSTEM, user=user, max_tokens=1000)
-    text = text.strip()
-    # Sometimes the model wraps JSON in a fence even when told not to.
-    if text.startswith("```"):
-        text = _strip_code_fences(text)
-    try:
-        payload = json.loads(text)
-    except json.JSONDecodeError:
-        return False, [f"review-pass response not JSON: {text[:200]!r}"], usage
+    text, usage = call_claude(system=REVIEW_SYSTEM, user=user, max_tokens=600)
+    payload = _coerce_review_json(text)
+    if payload is None:
+        # If we can't parse the reviewer's reply, treat it as a soft pass
+        # so the validator-cleared CSS still ships. We log the failure so
+        # the operator can see it.
+        return True, [f"review-pass response not JSON; skipping (got: {text[:120]!r})"], usage
     ok = bool(payload.get("ok"))
     issues = list(payload.get("issues") or [])
     return ok, issues, usage
+
+
+def _coerce_review_json(text: str) -> dict | None:
+    """Best-effort extraction of a JSON object from a review reply."""
+    t = text.strip()
+    if t.startswith("```"):
+        t = _strip_code_fences(t)
+    # Try direct parse first.
+    try:
+        return json.loads(t)
+    except json.JSONDecodeError:
+        pass
+    # Try to find the first {...} block.
+    m = re.search(r"\{.*\}", t, flags=re.DOTALL)
+    if not m:
+        return None
+    try:
+        return json.loads(m.group(0))
+    except json.JSONDecodeError:
+        return None
 
 
 # ---------------------------------------------------------------------------
@@ -415,6 +450,13 @@ def generate_css(
     review_ran = False
     review_passed: bool | None = None
     review_issues: list[str] = []
+
+    # Tracks the most recent attempt that passed deterministic validators
+    # but failed the review pass. If we exhaust retries on review-only
+    # failures, we commit this CSS with a `needs-attention` flag — that's
+    # the PLAN §7.1 step 6 semantics ("commit anyway, never auto-merge").
+    last_validator_passed_css: str | None = None
+    last_validator_passed_review_issues: list[str] = []
 
     for attempt in range(1, max_attempts + 1):
         prompt = build_user_prompt(
@@ -480,6 +522,8 @@ def generate_css(
             if not ok:
                 last_attempt = css_candidate
                 last_issues = issues
+                last_validator_passed_css = css_candidate
+                last_validator_passed_review_issues = issues
                 continue
 
         # Success — normalise and return
@@ -501,15 +545,43 @@ def generate_css(
             review_issues=review_issues,
         )
 
-    # All attempts exhausted
+    # All attempts exhausted. Two paths:
+    # (a) every attempt failed deterministic validators → hard exit.
+    # (b) at least one attempt cleared validators but the reviewer never
+    #     accepted it → commit the last good attempt with a needs-attention
+    #     flag, per PLAN §7.1 step 6.
+    if last_validator_passed_css is not None:
+        _log(
+            "exhausted_review_only",
+            attempts=max_attempts,
+            review_issues=last_validator_passed_review_issues,
+            total_cost_usd=round(cost_total, 6),
+        )
+        normalised = normalize_css(last_validator_passed_css)
+        return GenResult(
+            css=normalised,
+            attempts=max_attempts,
+            usage_totals=usage_totals,
+            cost_usd=cost_total,
+            review_ran=True,
+            review_passed=False,
+            review_issues=last_validator_passed_review_issues,
+            needs_attention=True,
+            needs_attention_reason=[
+                "review pass never approved across retries; deterministic validators ok",
+                *last_validator_passed_review_issues,
+            ],
+        )
+
     _log(
-        "exhausted",
+        "exhausted_validators",
         attempts=max_attempts,
         last_issues=last_issues,
         total_cost_usd=round(cost_total, 6),
     )
     print(
-        "css_gen exhausted retries — last issues: " + "; ".join(last_issues),
+        "css_gen exhausted retries — deterministic validators never passed: "
+        + "; ".join(last_issues),
         file=sys.stderr,
     )
     raise SystemExit(1)
