@@ -23,12 +23,15 @@ jobs:
           GDOC_TOKEN_JSON_B64: ${{ secrets.GDOC_TOKEN_JSON_B64 }}
           GDOC_CREDENTIALS_JSON_B64: ${{ secrets.GDOC_CREDENTIALS_JSON_B64 }}
         run: |
-          mkdir -p "$HOME/.config/gdoc"
+          mkdir -p "$HOME/.config/gdoc/accounts/default"
+          # gdoc reads the per-account token from accounts/<account>/token.json,
+          # not the legacy top-level path. Restore to both for safety.
+          printf '%s' "$GDOC_TOKEN_JSON_B64" | base64 -d > "$HOME/.config/gdoc/accounts/default/token.json"
           printf '%s' "$GDOC_TOKEN_JSON_B64" | base64 -d > "$HOME/.config/gdoc/token.json"
           printf '%s' "$GDOC_CREDENTIALS_JSON_B64" | base64 -d > "$HOME/.config/gdoc/credentials.json"
-          chmod 600 "$HOME/.config/gdoc/"*.json
-          # Sanity: files exist and are non-empty JSON (no value echo).
-          python3 -c "import json,os; json.load(open(os.path.expanduser('~/.config/gdoc/token.json'))); print('token.json: parseable JSON')"
+          chmod 600 "$HOME/.config/gdoc/token.json" "$HOME/.config/gdoc/credentials.json" "$HOME/.config/gdoc/accounts/default/token.json"
+          # Sanity: token parses as JSON and has refresh_token (no value echo).
+          python3 -c "import json,os; t=json.load(open(os.path.expanduser('~/.config/gdoc/accounts/default/token.json'))); assert t.get('refresh_token'); print('token.json: parseable, refresh_token present')"
           python3 -c "import json,os; json.load(open(os.path.expanduser('~/.config/gdoc/credentials.json'))); print('credentials.json: parseable JSON')"
 
       - name: Set up Python 3.12
