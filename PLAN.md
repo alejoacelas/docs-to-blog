@@ -41,12 +41,12 @@ These are already provisioned and authenticated on the machine running the build
 | Paragraph styling | **Prototype two implementations, A and B** (see §3) | We don't yet trust fuzzy-only matching, and we don't yet trust Claude-only matching. Build both, compare on real edits. |
 | Reconciler trust | **Claude reviews the diff every sync** in both A and B | No silent auto-apply — even in A, Claude is not an orphan-only fallback; it sees every change between sync N-1 and N. |
 | Per-sentence styling | **Out of scope for v1** | Use span tags instead. |
-| LLM execution model | **Anthropic SDK directly (no Claude Code, no agent harness)** | Every LLM step is a bounded transform — known inputs in, structured output out. The orchestrator runs deterministic validators + optional review-pass calls in a bounded retry loop. Looping and tooling stay in our code, not inside an agent. See §7. |
+| LLM execution model | **Every LLM step is a bounded transform** | Known inputs in, structured output out. No agent loop inside any call, no tool use mid-generation. The orchestrator runs deterministic validators + optional review-pass calls in a bounded retry loop in our code, not inside an agent. Specific SDK/library is implementation-level. See §7. |
 | Runner | **GitHub Actions on a configurable cron, driving a small script** | Default interval 60 minutes, set in `project.toml`. Free runner; has Python for `gdoc`, has `git`, has HTTPS to `api.anthropic.com`. |
 | Auth in CI | **`token.json` planted from base64 secret** | gdoc CLI's OAuth refresh-token flow works in Actions. |
 | Deploy | **Vercel** (hobby tier). Main site, previews, and the `/updates` page are all sub-paths of one Astro project; action endpoints colocate as serverless functions. | One platform hosts the static site and the API routes; secrets live in Vercel project env; no separate Worker or CORS to manage. Each open `sync/*` PR also gets a full preview build at `/preview/<slug>/` (P7). |
-| Review surface | **`/updates` page on the deployed site**, password-gated; action endpoints are Astro API routes deployed as Vercel serverless functions. | Author reviews and accepts changes on the live site; PR remains the commit mechanism but the author never has to open GitHub. See §8. |
-| PR policy | **Always open a PR; "Accept" button on `/updates` merges it** | The PR is the audit trail; the click is the action. Auto-merge on Call 4's `auto_merge_ok = true` is opt-in per project in `project.toml` for trusted runs. |
+| Review surface | **`/updates` page on the deployed site**, password-gated; action endpoints are Astro API routes deployed as Vercel serverless functions. | Author reviews and accepts changes on the live site. The author never has to open GitHub. See §8. |
+| Change-record policy | **Every change lands as a discrete, well-scoped commit; author approves before it publishes** | The commit history is the audit trail; the click on `/updates` is the action. How pending changes are *held* before approval — a PR, a `sync/*` branch, a drafts directory on `main` — is an implementation choice; PRs are a reasonable default but not required. Auto-merge (skipping the human gate) on Call 4's `auto_merge_ok = true` is opt-in per project in `project.toml` for trusted runs. |
 
 ---
 
@@ -239,7 +239,7 @@ Markdown narrative chosen over structured YAML because the file's job is to be h
 
 ## 7. LLM calls and the daily sync pipeline
 
-Every LLM step is a **bounded transform** invoked through the Anthropic SDK directly — known inputs in, structured output out. There is no agent loop inside any call, no tool use mid-generation. All looping happens in the orchestrator, where it is fully inspectable.
+Every LLM step is a **bounded transform** — known inputs in, structured output out. No agent loop inside any call, no tool use mid-generation. All looping happens in the orchestrator, where it's fully inspectable. The SDK/library used to invoke Claude is implementation-level; the constraint is the shape.
 
 ### 7.1 Shape of every LLM call
 
@@ -252,7 +252,9 @@ Every LLM step is a **bounded transform** invoked through the Anthropic SDK dire
 
 The model is invoked only where input is genuinely fuzzy. Anything mechanisable — fuzzy paragraph matching, CSS parsing, YAML schema, hashes, ordinals, markdown parsing — stays as plain code and either pre-runs to produce inputs for a call or post-runs as a validator.
 
-### 7.2 The four calls in v1
+### 7.2 The LLM-driven work in v1
+
+The fuzzy work decomposes into the jobs below. The four-call split is one reasonable shape — an implementer may fold the optional review-pass into the main call as self-critique, split a job into a candidate-and-verify pair, or merge two jobs whose inputs overlap. What must hold for each job: known inputs in, structured output out, deterministic validators that can reject, bounded retry that feeds failures back into the prompt. The per-call detail below is the *kind* of inputs/outputs/checks we want — not a literal API contract.
 
 **Call 1 — CSS generator.** Turns the prose definitions in the project `styling` tab (plus inherited library definitions) into `styles/generated.css`.
 
@@ -310,11 +312,13 @@ Cron interval is configurable (`[cron].interval_minutes` in `project.toml`, defa
 5. Astro build → final HTML. (P7 adds: also build /preview/<slug>/
    for every open sync/* PR — see §8.1.)
 
-6. Invoke Call 4 → verdict. If anything changed: open PR.
-   v1: the author reviews in the GitHub PR UI and merges there.
-   P7: the author reviews on /updates and clicks Accept to merge (§8).
-   Auto-merge (skipping the human gate) is opt-in per project.toml
-   AND requires Call 4 returned auto_merge_ok=true AND no upstream call
+6. Invoke Call 4 → verdict. If anything changed: stage the change for
+   review (e.g. open a PR, push a sync branch, write a drafts entry).
+   v1: the author reviews wherever the change is staged (GitHub PR UI
+   is a reasonable default) and accepts it there.
+   P7: the author reviews on /updates and clicks Accept to publish (§8).
+   Auto-merge (skipping the human gate) is opt-in per project.toml AND
+   requires Call 4 returned auto_merge_ok=true AND no upstream call
    exhausted retries.
 ```
 
@@ -331,10 +335,10 @@ The author reviews changes on the deployed site, not in GitHub. The PR is the co
 The Astro build emits three categories of output:
 
 - `/` and child paths — the current published content, built from `main`.
-- `/preview/<slug>/...` — one full preview build per open `sync/*` PR. Each preview is the whole site as it would be if that PR were merged. Slug is an unguessable string committed to the PR's branch.
-- `/updates` — a single page listing pending previews, with action buttons.
+- `/preview/<slug>/...` — one full preview build per pending change. Each preview is the whole site as it would be if that change were accepted. Slug is unguessable.
+- `/updates` — a single page listing pending changes, with action buttons.
 
-Every build fetches each open `sync/*` PR's branch, applies its artifact (`anchors.yaml` or `decisions.md` + styled markdown), and emits its preview alongside main. Builds are triggered by pushes to `main`, by cron, and by the "Check now" button.
+Every build emits a preview alongside main for each pending change. How pending changes are stored (PRs, `sync/*` branches, a drafts directory) is an implementation choice; the previewer enumerates them and applies their artifacts (`anchors.yaml` or `decisions.md` + styled markdown). Builds are triggered by pushes to `main`, by cron, and by the "Check now" button.
 
 ### 8.2 The `/updates` page contract
 
@@ -344,13 +348,13 @@ For each tracked document, it shows:
 
 - last-synced Drive version
 - latest-known Drive version (refreshed when the page loads, and when the user clicks "Check now")
-- the list of pending `sync/*` PRs for this doc, each annotated with: created timestamp, a one-line summary of the styling delta (which classes changed on which paragraphs), Call 4's verdict including any concerns, and a link to its preview
+- the list of pending changes for this doc, each annotated with: created timestamp, a one-line summary of the styling delta (which classes changed on which paragraphs), the run's verdict (from the final-gate LLM job — Call 4 in §7) including any concerns, and a link to its preview
 
 Per pending preview, three buttons:
 
 - **Open preview** → opens `/preview/<slug>/` in a new tab.
-- **Accept** → merges the PR via the action API. The next build promotes the preview to `/`; the preview slug disappears.
-- **Reject** → closes the PR. The preview slug disappears on the next build.
+- **Accept** → publishes the pending change via the action API. The next build promotes the preview to `/`; the preview slug disappears.
+- **Reject** → discards the pending change. The preview slug disappears on the next build.
 
 One global button:
 
@@ -362,14 +366,14 @@ Cron runs the pipeline on its interval whether or not the author is looking. So 
 
 ### 8.4 The action API
 
-A set of Astro API routes (`src/pages/api/*.ts`) deployed as Vercel serverless functions — same project, same domain, no separate service:
+The `/updates` page calls into a small action API hosted alongside the site as Astro API routes (Vercel serverless functions, same project, same domain, no separate service). The operations the API must expose:
 
-- `GET /api/pending` → JSON manifest of open `sync/*` PRs. Source of truth for `/updates`'s table.
-- `POST /api/accept` (PR id) → merges the PR.
-- `POST /api/reject` (PR id) → closes the PR.
-- `POST /api/check-now` → fires GitHub Actions `workflow_dispatch` on the sync workflow.
+- **list pending** → manifest of pending changes per doc. Source of truth for `/updates`'s table.
+- **accept(id)** → publish a pending change (merge PR, fast-forward branch, or promote drafts — whichever mechanism the implementation uses for §1's change-record policy).
+- **reject(id)** → discard a pending change.
+- **check now** → trigger the sync pipeline against the latest Drive state.
 
-All endpoints require an `X-Auth-Password` header that matches the `UPDATES_PASSWORD` Vercel env var. A fine-scoped `GITHUB_PAT` (also a Vercel env var) is used server-side for the merge/close/dispatch calls; the browser never sees it.
+All endpoints require an auth header matching the `UPDATES_PASSWORD` env var. Whatever credential is needed to act on pending changes (e.g. a fine-scoped `GITHUB_PAT` if changes live as commits in this GitHub repo) is server-side only; the browser never sees it.
 
 ### 8.5 What's not in v1
 
@@ -450,6 +454,6 @@ P4a and P4b are independent — designed to be dispatched to separate agents in 
 - The author can define / override named styles in the `styling` tab using prose.
 - The author can share named styles across projects via a library doc (gallery body + styling tab).
 - Both implementation A and B are shippable on parallel branches; one is selected as v1.1 default after side-by-side dogfooding.
-- Every styling change ships as a PR with the relevant artifact diff (`anchors.yaml` or `decisions.md`) for human review.
+- Every styling change ships as a discrete, reviewable change with the relevant artifact diff (`anchors.yaml` or `decisions.md`) attached; the author can accept or reject it before it publishes.
 - The whole thing runs on Vercel hobby + GH Actions + the user's Anthropic API key.
 - A `README.md` walks a new author through setting up a project from scratch in under 15 minutes.
