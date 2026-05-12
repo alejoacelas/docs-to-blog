@@ -42,6 +42,7 @@ from sync.fetch import (  # noqa: E402
 from sync.llm import estimate_cost_usd  # noqa: E402
 from sync.para_style_a import (  # noqa: E402
     ANCHORS_PATH,
+    REPO_ROOT,
     reconcile_from_disk,
     write_anchors_artifacts,
 )
@@ -195,6 +196,17 @@ def main() -> int:
         )
         para_needs_attention = para_result.needs_attention
         para_needs_attention_reason = para_result.needs_attention_reason
+
+        # Astro 5's content layer caches rendered HTML in
+        # node_modules/.astro/data-store.json. Its cache key doesn't include
+        # the remark plugins' source paths, so an updated anchors.yaml on
+        # its own doesn't invalidate the cache — the next `astro build`
+        # would serve stale HTML. Invalidate the store eagerly when we
+        # rewrite anchors so the next build re-runs the remark pipeline.
+        astro_cache = REPO_ROOT / "node_modules" / ".astro" / "data-store.json"
+        if astro_cache.exists():
+            astro_cache.unlink()
+            _log("invalidated_astro_cache", path=str(astro_cache.relative_to(Path.cwd())))
 
     # 5. Save state
     new_state = SyncState(
