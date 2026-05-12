@@ -9,7 +9,7 @@ This is the inaugural post on a site whose entire pipeline lives between a Googl
 
 The pipeline can ingest a Google Doc with a separate `styling` tab, render plain markdown to a styled static site, and survive daily edits without losing the per-paragraph styling attached to each piece of writing.
 
-A note for verification: the \<aside\>next paragraph carries\</aside\> no inline markup, yet it should render as an aside — that style assignment lives outside the source, in whichever of the two paragraph-styling artifacts (anchors.yaml or decisions.md) the pipeline is currently using.
+A note for verification: the <aside>next paragraph carries</aside> no inline markup, yet it should render as an aside — that style assignment lives outside the source, in whichever of the two paragraph-styling artifacts (anchors.yaml or decisions.md) the pipeline is currently using.
 
 When we first sketched the system on a napkin, the anchors were an afterthought. Now they're the load-bearing piece — or, if implementation B wins after dogfooding, they're gone entirely and the decisions file is the only audit trail.
 
