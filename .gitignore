@@ -24,6 +24,10 @@ build/
 # Logs
 *.log
 
+# Sync pipeline ephemeral state (Call 4 verdict, picked up by the workflow
+# between the sync step and the auto-merge gate, never committed).
+.sync-verdict.json
+
 # Sub-agent transcripts (if any are written locally)
 .subagent-transcripts/
 .vercel
