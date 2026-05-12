@@ -20,8 +20,9 @@ These are already provisioned and authenticated on the machine running the build
 | Library Google Doc (gallery body + `styling` tab) | `https://docs.google.com/document/d/1sPikfxprgeHnrDd9TINgzN3NHqsc3b7xZbPWg2h-Vrw/edit` — mirrored as `LIBRARY_DOC_URL` and `[doc].library_url` | `scripts/pull-library.ts` |
 | `gdoc` OAuth token + client | `~/.config/gdoc/token.json` (refresh-token-bearing); `~/.config/gdoc/credentials.json` (OAuth client) | local `gdoc cat`; CI restores from base64 secrets `GDOC_TOKEN_JSON_B64` + `GDOC_CREDENTIALS_JSON_B64` |
 | `ANTHROPIC_API_KEY` | `~/.config/credentials/.env` (global) and `.env` (project, gitignored); CI repo secret of the same name | Anthropic SDK calls in the LLM steps (see §7) |
-| `gh` CLI auth | macOS keychain (account `alejoacelas`), scopes `repo`, `workflow`, `gist`, `read:org` | repo provisioning, PR opening, Pages enable |
-| GitHub repo + Pages | Provisioned during pre-flight; remote is `origin`. Pages source: `workflow`. | the deploy step in the daily sync |
+| `gh` CLI auth | macOS keychain (account `alejoacelas`), scopes `repo`, `workflow`, `gist`, `read:org` | repo provisioning, PR opening |
+| GitHub repo | Provisioned during pre-flight; remote is `origin`. | source of truth for `main`, sync PRs, and CI |
+| Vercel project | Linked to the GitHub repo; Astro framework preset; production branch = `main`. Env vars: `ANTHROPIC_API_KEY` (+ P7 adds `GITHUB_PAT`, `UPDATES_PASSWORD`). | the deploy step in the daily sync, plus the action API routes added in P7 |
 | `project.toml` | repo root, committed | every pipeline script — doc URLs, cron, fuzzy threshold, cost cap, implementation toggle |
 | `.env` (local, gitignored) | repo root | local-dev shorthand so scripts find creds without re-grepping the global file |
 | `.env.example` (committed) | repo root | documents the env-var contract for collaborators |
@@ -43,8 +44,8 @@ These are already provisioned and authenticated on the machine running the build
 | LLM execution model | **Anthropic SDK directly (no Claude Code, no agent harness)** | Every LLM step is a bounded transform — known inputs in, structured output out. The orchestrator runs deterministic validators + optional review-pass calls in a bounded retry loop. Looping and tooling stay in our code, not inside an agent. See §7. |
 | Runner | **GitHub Actions on a configurable cron, driving a small script** | Default interval 60 minutes, set in `project.toml`. Free runner; has Python for `gdoc`, has `git`, has HTTPS to `api.anthropic.com`. |
 | Auth in CI | **`token.json` planted from base64 secret** | gdoc CLI's OAuth refresh-token flow works in Actions. |
-| Deploy | **GitHub Pages**. Main site, previews, and the `/updates` page are all sub-paths of one Astro build. | Static site, free, push-to-deploy. Each open `sync/*` PR also gets a full preview build at `/preview/<slug>/`. |
-| Review surface | **`/updates` page on the deployed site**, password-gated via a small Cloudflare Worker | Author reviews and accepts changes on the live site; PR remains the commit mechanism but the author never has to open GitHub. See §8. |
+| Deploy | **Vercel** (hobby tier). Main site, previews, and the `/updates` page are all sub-paths of one Astro project; action endpoints colocate as serverless functions. | One platform hosts the static site and the API routes; secrets live in Vercel project env; no separate Worker or CORS to manage. Each open `sync/*` PR also gets a full preview build at `/preview/<slug>/` (P7). |
+| Review surface | **`/updates` page on the deployed site**, password-gated; action endpoints are Astro API routes deployed as Vercel serverless functions. | Author reviews and accepts changes on the live site; PR remains the commit mechanism but the author never has to open GitHub. See §8. |
 | PR policy | **Always open a PR; "Accept" button on `/updates` merges it** | The PR is the audit trail; the click is the action. Auto-merge on Call 4's `auto_merge_ok = true` is opt-in per project in `project.toml` for trusted runs. |
 
 ---
@@ -306,17 +307,18 @@ Cron interval is configurable (`[cron].interval_minutes` in `project.toml`, defa
 
 4. If styling tab or library changed: invoke Call 1 → new generated.css.
 
-5. Astro build → final HTML, including a preview build at /preview/<slug>/
-   for every open sync/* PR (see §8.1).
+5. Astro build → final HTML. (P7 adds: also build /preview/<slug>/
+   for every open sync/* PR — see §8.1.)
 
 6. Invoke Call 4 → verdict. If anything changed: open PR.
-   The author reviews on /updates and clicks Accept to merge (§8).
-   Auto-merge (skipping the Accept click) is opt-in per project.toml
+   v1: the author reviews in the GitHub PR UI and merges there.
+   P7: the author reviews on /updates and clicks Accept to merge (§8).
+   Auto-merge (skipping the human gate) is opt-in per project.toml
    AND requires Call 4 returned auto_merge_ok=true AND no upstream call
    exhausted retries.
 ```
 
-The same workflow is fired by the cron *and* by the "Check now" button on `/updates`. Authors editing the styling tab iteratively don't have to wait for the next cron tick.
+In P7 the same workflow is also fired by the "Check now" button on `/updates`, so authors editing the styling tab iteratively don't have to wait for the next cron tick. In v1, only cron + `workflow_dispatch` trigger runs.
 
 ---
 
@@ -336,7 +338,7 @@ Every build fetches each open `sync/*` PR's branch, applies its artifact (`ancho
 
 ### 8.2 The `/updates` page contract
 
-The page loads as static HTML, prompts for a password on first visit (stored in `localStorage`), and then talks to the action Worker (§8.4) for data and actions.
+The page loads as static HTML, prompts for a password on first visit (stored in `localStorage`), and then talks to the action API (§8.4) for data and actions.
 
 For each tracked document, it shows:
 
@@ -347,7 +349,7 @@ For each tracked document, it shows:
 Per pending preview, three buttons:
 
 - **Open preview** → opens `/preview/<slug>/` in a new tab.
-- **Accept** → merges the PR via the action Worker. The next build promotes the preview to `/`; the preview slug disappears.
+- **Accept** → merges the PR via the action API. The next build promotes the preview to `/`; the preview slug disappears.
 - **Reject** → closes the PR. The preview slug disappears on the next build.
 
 One global button:
@@ -358,21 +360,21 @@ One global button:
 
 Cron runs the pipeline on its interval whether or not the author is looking. So when the author opens `/updates` in the morning, any doc edits made since the last visit already have previews waiting. The author never *has* to wait for cron, because Check now does the same work on demand.
 
-### 8.4 The action Worker
+### 8.4 The action API
 
-A small Cloudflare Worker (free tier; not the site host, just an HTTP endpoint) handles:
+A set of Astro API routes (`src/pages/api/*.ts`) deployed as Vercel serverless functions — same project, same domain, no separate service:
 
 - `GET /api/pending` → JSON manifest of open `sync/*` PRs. Source of truth for `/updates`'s table.
 - `POST /api/accept` (PR id) → merges the PR.
 - `POST /api/reject` (PR id) → closes the PR.
 - `POST /api/check-now` → fires GitHub Actions `workflow_dispatch` on the sync workflow.
 
-All endpoints require an `X-Auth-Password` header that matches a Worker secret. The Worker holds a fine-scoped GitHub PAT as a second secret; the website itself never sees the PAT.
+All endpoints require an `X-Auth-Password` header that matches the `UPDATES_PASSWORD` Vercel env var. A fine-scoped `GITHUB_PAT` (also a Vercel env var) is used server-side for the merge/close/dispatch calls; the browser never sees it.
 
 ### 8.5 What's not in v1
 
 - Per-paragraph in-line accept/reject. Unit of review is the whole PR.
-- Public previews behind hard auth. Slugs are unguessable but pages are not actively gated — acceptable for a personal blog. Cloudflare Access in front of GH Pages is the v2 upgrade.
+- Public previews behind hard auth. Slugs are unguessable but pages are not actively gated — acceptable for a personal blog. Vercel Authentication (or Cloudflare Access in front of the domain) is the v2 upgrade.
 - Multi-author auth. Shared-password v1.
 - Side-by-side preview diffing on the page. Open two tabs.
 
@@ -410,10 +412,11 @@ All endpoints require an `X-Auth-Password` header that matches a Worker secret. 
 | **P3.** Span tags end-to-end (parser + remark plugin). | `<aside>x</aside>` works. |
 | **P4a.** Implementation A: anchors + Claude-reviews-diff. | Branch A shippable. |
 | **P4b.** Implementation B: Claude-decides-every-sync + decisions file. | Branch B shippable. |
-| **P5.** GitHub Actions cron + PR workflow + Pages deploy. | Daily autonomous operation (on either branch). |
+| **P5.** GitHub Actions cron + PR workflow + Vercel deploy of `main`. | Daily autonomous operation (on either branch). Review still happens in the GitHub PR UI in v1; the `/updates` page is P7. |
 | **P6.** Comparison harness + dogfooding. Pick A or B. | v1.1 ready. |
+| **P7.** `/updates` page + per-PR `/preview/<slug>/` builds + action API routes (§8). | Author reviews and accepts on the deployed site instead of the GitHub PR UI. Builds on the winning implementation from P6; orthogonal to the A-vs-B decision. |
 
-P4a and P4b are independent — designed to be dispatched to separate agents in parallel.
+P4a and P4b are independent — designed to be dispatched to separate agents in parallel. P7 is deferred until after P6 picks a winner.
 
 ---
 
@@ -448,5 +451,5 @@ P4a and P4b are independent — designed to be dispatched to separate agents in 
 - The author can share named styles across projects via a library doc (gallery body + styling tab).
 - Both implementation A and B are shippable on parallel branches; one is selected as v1.1 default after side-by-side dogfooding.
 - Every styling change ships as a PR with the relevant artifact diff (`anchors.yaml` or `decisions.md`) for human review.
-- The whole thing runs on free GitHub Pages + GH Actions + the user's Anthropic API key.
+- The whole thing runs on Vercel hobby + GH Actions + the user's Anthropic API key.
 - A `README.md` walks a new author through setting up a project from scratch in under 15 minutes.

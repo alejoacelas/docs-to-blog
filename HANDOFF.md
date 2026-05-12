@@ -103,14 +103,14 @@ claude --dangerously-skip-permissions
 
 You are running **Implementation A** of docs-to-blog in this git worktree, on branch `impl-a`. A companion session is independently building Implementation B in `../docs-to-blog-B` on branch `impl-b`. **You never coordinate with it; do not read its files; do not push to its branch.**
 
-`PLAN.md` at the repo root is authoritative. Section 0 lists every prepared resource (Google Docs, OAuth, GitHub repo, Pages, secrets, .env). Section 3.A describes Implementation A specifically: anchors-yaml + Claude reviews the diff every sync (fuzzy matcher as pre-pass hint, Claude is the decider). Section 7 step 3a is your pipeline branch.
+`PLAN.md` at the repo root is authoritative. Section 0 lists every prepared resource (Google Docs, OAuth, GitHub repo, Vercel project, secrets, .env). Section 3.A describes Implementation A specifically: anchors-yaml + Claude reviews the diff every sync (fuzzy matcher as pre-pass hint, Claude is the decider). Section 7 step 3a is your pipeline branch.
 
 **Your scope:** Build phases **P1, P2, P3, P4a, P5** end-to-end on branch `impl-a`. Push to `origin/impl-a`. **Do not build P4b or P6** — P4b is the other session's job; P6 is the user's taste call after both branches are pushed.
 
 **Constraints:**
 - All operating rules in `HANDOFF.md` apply. The pipeline uses the Anthropic SDK directly — no `claude -p` in `sync.yml`.
 - Set `[doc].implementation = "a"` in `project.toml` before pushing.
-- The cron in `sync.yml` should be active (`on: schedule`) so we can dogfood. Pages stays pointed at `main` until v1.1 pick — don't touch Pages config.
+- The cron in `sync.yml` should be active (`on: schedule`) so we can dogfood. Vercel's Production deploy stays pointed at `main` until v1.1 pick — don't touch the Vercel project config.
 - Fixtures in `tests/fixtures/day1/` and `tests/fixtures/day2/` (PLAN § 9.1) must pass for Implementation A.
 
 **Sequence (zero interaction expected between checkpoints):**
@@ -153,14 +153,14 @@ claude --dangerously-skip-permissions
 
 You are running **Implementation B** of docs-to-blog in this git worktree, on branch `impl-b`. A companion session is independently building Implementation A in `../docs-to-blog-A` on branch `impl-a`. **You never coordinate with it; do not read its files; do not push to its branch.**
 
-`PLAN.md` at the repo root is authoritative. Section 0 lists every prepared resource (Google Docs, OAuth, GitHub repo, Pages, secrets, .env). Section 3.B describes Implementation B specifically: no anchors file; Claude reads the full new doc + styling tab + library + previous `styling/decisions.md` every sync, and produces a styled-markdown intermediate plus an updated `decisions.md`. Section 7 step 3b is your pipeline branch.
+`PLAN.md` at the repo root is authoritative. Section 0 lists every prepared resource (Google Docs, OAuth, GitHub repo, Vercel project, secrets, .env). Section 3.B describes Implementation B specifically: no anchors file; Claude reads the full new doc + styling tab + library + previous `styling/decisions.md` every sync, and produces a styled-markdown intermediate plus an updated `decisions.md`. Section 7 step 3b is your pipeline branch.
 
 **Your scope:** Build phases **P1, P2, P3, P4b, P5** end-to-end on branch `impl-b`. Push to `origin/impl-b`. **Do not build P4a or P6** — P4a is the other session's job; P6 is the user's taste call after both branches are pushed.
 
 **Constraints:**
 - All operating rules in `HANDOFF.md` apply. The pipeline uses the Anthropic SDK directly — no `claude -p` in `sync.yml`.
 - Set `[doc].implementation = "b"` in `project.toml` before pushing.
-- The cron in `sync.yml` should be active (`on: schedule`) so we can dogfood. Pages stays pointed at `main` until v1.1 pick — don't touch Pages config.
+- The cron in `sync.yml` should be active (`on: schedule`) so we can dogfood. Vercel's Production deploy stays pointed at `main` until v1.1 pick — don't touch the Vercel project config.
 - Fixtures in `tests/fixtures/day1/` and `tests/fixtures/day2/` (PLAN § 9.1) must pass for Implementation B.
 - The decisions file format: markdown narrative is the current default per PLAN § 6.B and § 11.5. If you find a compelling reason to use structured YAML instead, document the call in `notes/comparison/B-summary.md` and proceed — don't pause.
 
@@ -202,7 +202,7 @@ If you hit a genuine external outage (Anthropic API or Google Docs returning 5xx
 1. Trigger both workflows manually against the same fixture (`gh workflow run sync.yml --ref impl-a` and `--ref impl-b`).
 2. Compare the resulting `anchors.yaml` (A) vs `decisions.md` (B) for clarity, inspectability, and accuracy.
 3. Compare daily costs in the Anthropic console.
-4. Pick a winner. Merge the chosen branch into `main` and update Pages source.
+4. Pick a winner. Merge the chosen branch into `main`; Vercel auto-deploys `main`.
 5. Delete the loser branch (or keep it parked).
 
 The comparison artifacts in `notes/comparison/` should make this 15 minutes of skimming, not a fresh investigation.
